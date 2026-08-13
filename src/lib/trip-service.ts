@@ -1,5 +1,5 @@
 import { prisma } from "./db";
-import { calculatePackList } from "./calculator";
+import { buildPackList } from "./ai-pack";
 import { generateInviteCode, USER_COLORS } from "./utils";
 import type { PackGender, TripDraft } from "./types";
 import type { SuitcasePlan, SuitcaseSize } from "./suitcases";
@@ -95,7 +95,7 @@ export async function createTripFromDraft(
       : []),
   ];
 
-  const items = calculatePackList(draft.legs, travelers);
+  const { items } = await buildPackList({ legs: draft.legs, travelers });
   const plans =
     suitcasePlans && suitcasePlans.length > 0
       ? suitcasePlans

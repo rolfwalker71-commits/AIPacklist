@@ -47,10 +47,12 @@ export function VibeInput({ onParsed, travelers }: Props) {
       if (!res.ok) throw new Error("Auswertung fehlgeschlagen");
       const data = await res.json();
       const engine =
-        data.parseSource === "openai" ? "KI (OpenAI)" : "Regelparser (Ersatz)";
+        data.parseSource === "openai" ? "KI-Etappen" : "Regel-Etappen";
+      const pack =
+        data.packSource === "openai" ? "KI-Packliste" : "Regel-Packliste";
       setSummary(
-        `${engine} · ${data.draft.legs.length} Etappen · ${data.summary.daysWithoutLaundry} Tage ohne Wäsche · ${data.preview.length} Einträge` +
-          (data.tips?.length ? ` · ${data.tips.length} KI-Tipps` : "")
+        `${engine} · ${pack} · ${data.draft.legs.length} Etappen · ${data.summary.daysWithoutLaundry} Tage ohne Wäsche · ${data.preview.length} Einträge` +
+          (data.tips?.length ? ` · ${data.tips.length} Tipps` : "")
       );
       onParsed(data.draft);
     } catch (e) {

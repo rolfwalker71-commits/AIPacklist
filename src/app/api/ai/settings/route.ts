@@ -22,6 +22,7 @@ export async function GET() {
     model: getOpenAiModel(),
     features: [
       "KI-Freitext → Etappen erkennen",
+      "Komplette Packliste per KI (Regeln nur als Fallback)",
       "Packliste mit KI verfeinern",
       "Reise-Tipps",
     ],
