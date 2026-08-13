@@ -30,8 +30,9 @@ export async function enrichPackListWithAi(args: {
     const ai = await aiJsonCompletion<AiSuggestResponse>({
       system: `Du bist Packlisten-Experte für FlexiPack (Paare/Gruppen, Multi-Etappen).
 Schlage NUR zusätzliche sinnvolle Einträge vor, die in existing noch fehlen.
-Keine Duplikate. Persönliche Dinge (Pass, ESTA, Powerbank, Ladekabel, Zahnbürste) nie als gemeinsam markieren.
-Gemeinsam nur für wirklich Teilbares (Sonnencreme, Schirm, Erste Hilfe, Kabinen-Organizer).
+Keine Duplikate. Persönliche Dinge nie als gemeinsam markieren: Pass, ESTA, Powerbank, Ladekabel, Zahnbürste (jede Person eine eigene).
+Gemeinsam nur für wirklich Teilbares (Zahnpasta, Sonnencreme, Schirm, Erste Hilfe, Kabinen-Organizer, Duschgel).
+Niemals „Zahnbürste & Zahnpasta“ als ein gemeinsames Paket vorschlagen.
 JSON:
 {
   "items": [{

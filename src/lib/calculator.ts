@@ -246,7 +246,7 @@ function personalItemsForTraveler(
   }
 
   push("Medikamente (persönlich)", "Gesundheit", 1);
-  push("Zahnbürste & Zahnpasta", "Pflege", 1);
+  push("Zahnbürste", "Pflege", 1);
   push("Handy-Ladekabel / Netzteil", "Technik", 1);
   push("Powerbank", "Technik", 1);
   push("Bequeme Schuhe Alltag", "Schuhe", 1);
@@ -329,6 +329,7 @@ export function calculatePackList(
   }
 
   pushShared("Duschgel / Shampoo", "Pflege", 1);
+  pushShared("Zahnpasta", "Pflege", 1);
   pushShared("Erste-Hilfe-Mini", "Gesundheit", 1);
 
   return items;
