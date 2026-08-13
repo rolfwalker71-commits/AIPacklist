@@ -97,3 +97,77 @@ export async function POST(
     return NextResponse.json({ error }, { status });
   }
 }
+
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: Promise<{ tripId: string }> }
+) {
+  try {
+    const sessionUser = await requireSessionUser();
+    const { tripId } = await params;
+    const body = await req.json().catch(() => ({}));
+    const userId =
+      (body as { userId?: string }).userId ||
+      req.nextUrl.searchParams.get("userId");
+
+    if (!userId) {
+      return NextResponse.json({ error: "userId nötig" }, { status: 400 });
+    }
+
+    const trip = await prisma.trip.findUnique({
+      where: { id: tripId },
+      include: { members: true },
+    });
+    if (!trip) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
+
+    const target = trip.members.find((m) => m.userId === userId);
+    if (!target) {
+      return NextResponse.json(
+        { error: "Person ist nicht auf dieser Reise." },
+        { status: 404 }
+      );
+    }
+
+    const actorIsOwner =
+      trip.ownerId === sessionUser.id || sessionUser.role === "ADMIN";
+    const removingSelf = userId === sessionUser.id;
+
+    if (!actorIsOwner && !removingSelf) {
+      return NextResponse.json(
+        { error: "Nur die Trip-Besitzer:in kann andere entfernen." },
+        { status: 403 }
+      );
+    }
+
+    if (userId === trip.ownerId) {
+      return NextResponse.json(
+        {
+          error:
+            "Die Trip-Besitzer:in kann nicht entfernt werden.",
+        },
+        { status: 400 }
+      );
+    }
+
+    await prisma.tripMember.delete({
+      where: { tripId_userId: { tripId, userId } },
+    });
+
+    publish({
+      type: "trip_updated",
+      tripId,
+      payload: { memberRemoved: userId },
+    });
+
+    const full = await prisma.trip.findUniqueOrThrow({
+      where: { id: tripId },
+      include: tripInclude,
+    });
+    return NextResponse.json(serializeTrip(full));
+  } catch (e) {
+    const { error, status } = authErrorResponse(e);
+    return NextResponse.json({ error }, { status });
+  }
+}

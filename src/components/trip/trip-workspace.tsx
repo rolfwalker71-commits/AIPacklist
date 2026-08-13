@@ -13,6 +13,7 @@ import {
   Sparkles,
   Clock,
   ListChecks,
+  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -114,6 +115,7 @@ type Trip = {
     owner?: MemberUser | null;
   }[];
   members: {
+    id?: string;
     role: string;
     user: MemberUser;
   }[];
@@ -768,6 +770,36 @@ export function TripWorkspace({
     trip.members.some((m) => m.user.id === user.id && m.role === "OWNER") ||
     user.role === "ADMIN";
 
+  const removeMember = async (memberUserId: string) => {
+    const member = trip.members.find((m) => m.user.id === memberUserId);
+    const label = member?.user.name || "diese Person";
+    if (
+      !window.confirm(
+        `${label} von dieser Reise entfernen? Die Person verliert den Zugang zur Packliste.`
+      )
+    ) {
+      return;
+    }
+    const res = await fetch(`/api/trips/${trip.id}/members`, {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId: memberUserId }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      setAiMessage(data.error || "Entfernen fehlgeschlagen");
+      return;
+    }
+    setTrip({ ...data, aiInsights: normalizeInsights(data.aiInsights) });
+    setAiMessage(`${label} entfernt`);
+  };
+
+  const canRemoveMember = (memberUserId: string) => {
+    if (memberUserId === trip.ownerId) return false;
+    if (isTripOwner) return true;
+    return memberUserId === user.id;
+  };
+
   const renderItem = (item: PackItem) => {
     const owner = resolveItemOwner(item, trip);
     const color =
@@ -1401,7 +1433,7 @@ export function TripWorkspace({
               <div className="mt-2 flex flex-wrap gap-2">
                 {trip.members.map((m) => (
                   <span
-                    key={m.user.id}
+                    key={m.id || m.user.id}
                     className="inline-flex items-center gap-2 rounded-full border border-stone-200 bg-stone-50 px-2 py-1 text-xs"
                   >
                     {m.user.avatarUrl ? (
@@ -1419,12 +1451,23 @@ export function TripWorkspace({
                     )}
                     {m.user.name}
                     <span className="text-stone-400">
-                      {m.role === "OWNER"
+                      {m.user.id === trip.ownerId || m.role === "OWNER"
                         ? "Besitzer:in"
                         : m.role === "PARTNER"
                           ? "Mitreisende:r"
                           : m.role}
                     </span>
+                    {canRemoveMember(m.user.id) && (
+                      <button
+                        type="button"
+                        onClick={() => removeMember(m.user.id)}
+                        className="ml-0.5 rounded-full p-0.5 text-stone-400 transition hover:bg-rose-50 hover:text-rose-600"
+                        aria-label={`${m.user.name} entfernen`}
+                        title="Von der Reise entfernen"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    )}
                   </span>
                 ))}
                 <span className="inline-flex items-center gap-2 rounded-full border border-amber-200 bg-amber-50 px-2 py-1 text-xs text-amber-900">
@@ -1435,6 +1478,10 @@ export function TripWorkspace({
                   Gemeinsam
                 </span>
               </div>
+              <p className="mt-2 text-xs text-stone-500">
+                Überzählige Mitreisende mit × entfernen. Die Trip-Besitzer:in
+                bleibt immer bestehen.
+              </p>
             </div>
             <div>
               <Label className="flex items-center gap-1">
