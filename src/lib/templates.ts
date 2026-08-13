@@ -22,7 +22,7 @@ export const TEMPLATES: PackTemplate[] = [
     id: "cruise-special",
     name: "Kreuzfahrt Spezial",
     description:
-      "Lange Seetage ohne Wäsche, Gala-Abende und variables Atlantikwetter.",
+      "Lange Seetage ohne Wäsche, Gala-Abende und wechselhaftem Atlantikwetter.",
     tagline: "Schiff · Gala · Deck",
     build: (startDate) => {
       const start = baseStart(startDate);
@@ -98,7 +98,7 @@ export const TEMPLATES: PackTemplate[] = [
     id: "roadtrip",
     name: "Roadtrip",
     description:
-      "Flexible Etappen mit Auto, Waschsalons und Outdoor-Ausrüstung.",
+      "Flexible Etappen mit Auto, Waschsalons und Freizeit-Ausrüstung.",
     tagline: "Auto · Freedom",
     build: (startDate) => {
       const start = baseStart(startDate);

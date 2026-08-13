@@ -15,13 +15,18 @@ export default function CreatePage() {
             Neue Packliste
           </h1>
           <p className="mt-1 text-stone-600">
-            Wizard, Vibe Input oder Template — alles landet in derselben
-            Calculator Engine.
+            Assistent, KI-Freitext oder Vorlage — alles landet in derselben
+            Mengenberechnung.
           </p>
         </div>
-        <Link href="/join">
-          <Button variant="outline">Beitreten</Button>
-        </Link>
+        <div className="flex gap-2">
+          <Link href="/settings">
+            <Button variant="outline">KI-Einstellungen</Button>
+          </Link>
+          <Link href="/join">
+            <Button variant="outline">Beitreten</Button>
+          </Link>
+        </div>
       </div>
       <Suspense>
         <CreateTripClient />

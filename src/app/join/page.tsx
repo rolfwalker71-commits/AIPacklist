@@ -25,7 +25,7 @@ function JoinForm() {
     setError(null);
     try {
       const find = await fetch(`/api/join?code=${encodeURIComponent(code)}`);
-      if (!find.ok) throw new Error("Code ungültig");
+      if (!find.ok) throw new Error("Einladungscode ungültig");
       const trip = await find.json();
       const local = ensureLocalUser();
       const user = {
@@ -52,7 +52,7 @@ function JoinForm() {
   return (
     <div className="mx-auto max-w-md space-y-4 rounded-2xl border border-stone-200 bg-white/80 p-6">
       <div>
-        <Label>Invite-Code</Label>
+        <Label>Einladungscode</Label>
         <Input
           value={code}
           onChange={(e) => setCode(e.target.value.toUpperCase())}
@@ -79,11 +79,11 @@ export default function JoinPage() {
         ← FlexiPack
       </Link>
       <h1 className="mt-4 font-display text-3xl text-stone-950">
-        Trip beitreten
+        Reise beitreten
       </h1>
       <p className="mb-8 mt-1 text-stone-600">
-        Mit Invite-Code als Partner:in einsteigen und Shared Items live
-        mitpacken.
+        Mit Einladungscode als Mitreisende:r einsteigen und gemeinsame Einträge
+        live mitpacken.
       </p>
       <Suspense>
         <JoinForm />

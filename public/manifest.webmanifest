@@ -1,7 +1,8 @@
 {
   "name": "FlexiPack",
   "short_name": "FlexiPack",
-  "description": "Flexible Reise-Packlisten für Multi-Etappen, Paare und Gruppen",
+  "description": "Flexible Reise-Packlisten für Mehr-Etappen, Paare und Gruppen",
+  "lang": "de-CH",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#F7F3EB",

@@ -36,10 +36,11 @@ yarn-error.log*
 .env.*.local
 !.env.example
 
-# local sqlite
+# local sqlite + AI settings
 /data/*.db
 /data/*.db-journal
 /data/*.db-*
+/data/ai-settings.json
 
 # vercel
 .vercel

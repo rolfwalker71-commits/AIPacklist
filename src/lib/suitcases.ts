@@ -5,10 +5,10 @@ export const SUITCASE_SIZES: {
   label: string;
   hint: string;
 }[] = [
-  { id: "CABIN", label: "Handgepäck", hint: "Kabinenmaß / ~8–10 kg" },
-  { id: "MEDIUM", label: "Mittel", hint: "Check-in ~55–70 cm / ~20–23 kg" },
-  { id: "LARGE", label: "Groß", hint: "Großer Check-in / ~23–28 kg" },
-  { id: "XL", label: "XL", hint: "Übergröße / Sperrgepäck" },
+  { id: "CABIN", label: "Handgepäck", hint: "Kabinenmass / ca. 8–10 kg" },
+  { id: "MEDIUM", label: "Mittel", hint: "Aufgabegepäck ca. 55–70 cm / 20–23 kg" },
+  { id: "LARGE", label: "Gross", hint: "Grosses Aufgabegepäck / ca. 23–28 kg" },
+  { id: "XL", label: "Sehr gross", hint: "Übergrösse / Sperrgepäck" },
 ];
 
 export function suitcaseSizeLabel(size: SuitcaseSize | string): string {

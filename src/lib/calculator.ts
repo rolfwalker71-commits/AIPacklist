@@ -170,7 +170,7 @@ function personalItemsForTraveler(
       Math.min(4, Math.ceil(noLaundryDays / 3) + 1),
       { notes: "Zwiebellook für Deck/Kühlwetter" }
     );
-    push("Windbreaker / Softshell", "Outdoor", 1, {
+    push("Windjacke / Softshell", "Freizeit", 1, {
       notes: "Atlantik-/Seewetter",
     });
     push(
@@ -183,36 +183,36 @@ function personalItemsForTraveler(
   }
 
   if (hasTag(legs, "uncertain") || hasTag(legs, "rainy")) {
-    push("Regenjacke / Packable Rain Shell", "Outdoor", 1);
+    push("Packbare Regenjacke", "Freizeit", 1);
   }
 
   const gala = countGalaEvents(legs);
   if (gala > 0) {
     if (gender === "FEMALE") {
-      push("Abendkleid / Cocktailkleid", "Formal", Math.min(gala, 2), {
+      push("Abendkleid / Cocktailkleid", "Festlich", Math.min(gala, 2), {
         notes: `${gala} Gala-Abend(e)`,
       });
       push("Abendschuhe / Pumps", "Schuhe", 1);
       push("Schmuck / Clutch", "Accessoires", 1);
     } else if (gender === "MALE") {
-      push("Anzug / Smoking", "Formal", Math.min(gala, 2), {
+      push("Anzug / Smoking", "Festlich", Math.min(gala, 2), {
         notes: `${gala} Gala-Abend(e)`,
       });
       push("Formelle Lederschuhe", "Schuhe", 1);
       push("Krawatte / Fliege", "Accessoires", 1);
     } else {
-      push("Abendgarderobe (Anzug / Abendkleid)", "Formal", Math.min(gala, 2), {
+      push("Abendgarderobe (Anzug / Abendkleid)", "Festlich", Math.min(gala, 2), {
         notes: `${gala} Gala-Abend(e)`,
       });
       push("Formelle Schuhe", "Schuhe", 1);
-      push("Accessoires Formal", "Accessoires", 1);
+      push("Festliche Accessoires", "Accessoires", 1);
     }
   }
 
   if (hasDress(legs, "sport")) {
     push("Sportschuhe", "Schuhe", 1);
     push(
-      gender === "FEMALE" ? "Sport-Top / Shirt" : "Sportshirt",
+      gender === "FEMALE" ? "Sport-Top" : "Sportshirt",
       "Aktivität",
       Math.min(3, Math.ceil(noLaundryDays / 4))
     );
@@ -226,10 +226,10 @@ function personalItemsForTraveler(
   if (hasDress(legs, "casual") || hasDress(legs, "smart_casual")) {
     push(
       gender === "FEMALE"
-        ? "Blusen / Kleider / Casual Outfits"
+        ? "Blusen / Kleider / lässige Outfits"
         : gender === "MALE"
-          ? "Hemden / Casual Outfits"
-          : "Casual Outfits (Hemd / Bluse)",
+          ? "Hemden / lässige Outfits"
+          : "Lässige Outfits (Hemd / Bluse)",
       "Kleidung",
       Math.min(3, Math.ceil(noLaundryDays / 4))
     );
@@ -237,16 +237,16 @@ function personalItemsForTraveler(
 
   // Gender-specific toiletries (personal, not shared)
   if (gender === "FEMALE") {
-    push("Haarpflege / Styling", "Toiletries", 1);
+    push("Haarpflege / Styling", "Pflege", 1);
     if (noLaundryDays >= 5) {
-      push("Hygieneartikel (Monatshygiene)", "Toiletries", 1);
+      push("Hygieneartikel (Monatshygiene)", "Pflege", 1);
     }
   } else if (gender === "MALE") {
-    push("Rasierer / Rasierpflege", "Toiletries", 1);
+    push("Rasierer / Rasierpflege", "Pflege", 1);
   }
 
   push("Medikamente (persönlich)", "Gesundheit", 1);
-  push("Zahnbürste & Zahnpasta", "Toiletries", 1);
+  push("Zahnbürste & Zahnpasta", "Pflege", 1);
   push("Handy-Ladekabel / Netzteil", "Technik", 1);
   push("Powerbank", "Technik", 1);
   push("Bequeme Schuhe Alltag", "Schuhe", 1);
@@ -310,7 +310,7 @@ export function calculatePackList(
 
   // Shared couple / group essentials (nur wirklich Teilbare)
   if (hasTag(legs, "tropical") || hasTag(legs, "hot")) {
-    pushShared("Sonnencreme SPF50", "Toiletries", 1);
+    pushShared("Sonnencreme SPF50", "Pflege", 1);
   }
   if (hasTag(legs, "uncertain") || hasTag(legs, "rainy")) {
     pushShared("Kompaktschirm", "Accessoires", 1);
@@ -320,15 +320,15 @@ export function calculatePackList(
     pushShared("Kabinen-Organizer / Magnettaschen", "Technik", 1);
   }
   if (hasTransport(legs, "FLIGHT")) {
-    pushShared("Nackenkissen / Schlafmaske (Shared)", "Reise", 1);
-    pushShared("Handgepäck-Essentials Check", "Reise", 1);
+    pushShared("Nackenkissen / Schlafmaske (gemeinsam)", "Reise", 1);
+    pushShared("Handgepäck-Checkliste", "Reise", 1);
   }
   if (hasTransport(legs, "CAR")) {
     pushShared("Ladekabel Auto", "Technik", 1);
     pushShared("Snacks für unterwegs", "Reise", 1);
   }
 
-  pushShared("Duschgel / Shampoo", "Toiletries", 1);
+  pushShared("Duschgel / Shampoo", "Pflege", 1);
   pushShared("Erste-Hilfe-Mini", "Gesundheit", 1);
 
   return items;

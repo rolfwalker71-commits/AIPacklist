@@ -23,7 +23,7 @@ export function GenderPicker({
     <div>
       <Label>{label}</Label>
       <p className="mb-2 text-xs text-stone-500">
-        Beeinflusst persönliche Kleidung & Formalwear — optional.
+        Beeinflusst persönliche Kleidung und Abendgarderobe — freiwillig.
       </p>
       <div className="flex flex-wrap gap-2">
         {OPTIONS.map((opt) => (

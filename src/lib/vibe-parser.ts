@@ -47,7 +47,7 @@ export function parseVibePrompt(prompt: string, startDate?: string): TripDraft {
 
 function splitSegments(text: string): string[] {
   const parts = text
-    .split(/\b(?:danach|dann|anschließend|then|followed by|after that|, dann)\b/i)
+    .split(/\b(?:danach|dann|anschliessend|anschließend|then|followed by|after that|, dann)\b/i)
     .map((p) => p.trim())
     .filter(Boolean);
   return parts.length > 1 ? parts : text ? [text] : [];

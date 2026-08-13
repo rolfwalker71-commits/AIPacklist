@@ -112,7 +112,7 @@ export function CreateTripClient() {
           suitcasePlans,
         }),
       });
-      if (!res.ok) throw new Error("Trip konnte nicht erstellt werden");
+      if (!res.ok) throw new Error("Reise konnte nicht erstellt werden");
       const trip = await res.json();
       router.push(`/trip/${trip.id}`);
     } catch (e) {
@@ -126,9 +126,9 @@ export function CreateTripClient() {
       <div className="flex flex-wrap gap-2">
         {(
           [
-            ["wizard", "Multi-Leg Wizard", Waypoints],
-            ["vibe", "Vibe Input", Sparkles],
-            ["templates", "Templates", LayoutTemplate],
+            ["wizard", "Etappen-Assistent", Waypoints],
+            ["vibe", "KI-Freitext", Sparkles],
+            ["templates", "Vorlagen", LayoutTemplate],
           ] as const
         ).map(([id, label, Icon]) => (
           <button
@@ -151,7 +151,7 @@ export function CreateTripClient() {
       <div className="grid gap-6 rounded-2xl border border-stone-200 bg-white/70 p-4 md:grid-cols-2">
         <div className="space-y-3">
           <div>
-            <Label>Dein Name (Besitzer)</Label>
+            <Label>Dein Name (Besitzer:in)</Label>
             <Input
               value={ownerName}
               onChange={(e) => setOwnerName(e.target.value)}
@@ -165,7 +165,7 @@ export function CreateTripClient() {
             <Input
               value={partnerName}
               onChange={(e) => setPartnerName(e.target.value)}
-              placeholder="Optional"
+              placeholder="Freiwillig"
             />
           </div>
           {partnerName.trim() && (
@@ -212,9 +212,21 @@ export function CreateTripClient() {
               setDraft(d);
               setMode("wizard");
             }}
+            travelers={[
+              { key: "owner", name: ownerName || "Du", gender: ownerGender },
+              ...(partnerName.trim()
+                ? [
+                    {
+                      key: "partner",
+                      name: partnerName,
+                      gender: partnerGender,
+                    },
+                  ]
+                : []),
+            ]}
           />
           <p className="text-sm text-stone-500">
-            Nach dem Parse landest du im Wizard zur Feinjustierung.
+            Nach der Erkennung landest du im Assistenten zur Feinjustierung.
           </p>
         </div>
       )}
@@ -232,7 +244,7 @@ export function CreateTripClient() {
           {draft && (
             <div className="flex flex-wrap items-center gap-3">
               <Button onClick={() => setMode("wizard")} variant="secondary">
-                Im Wizard anpassen
+                Im Assistenten anpassen
               </Button>
               <Button disabled={busy} onClick={() => create(draft)}>
                 Direkt erstellen

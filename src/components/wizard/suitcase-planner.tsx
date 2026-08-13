@@ -38,7 +38,7 @@ export function defaultSuitcasePlans(
   }
   plans.push({
     id: uid(),
-    name: "Handgepäck / Shared",
+    name: "Handgepäck / Gemeinsam",
     size: "CABIN",
     ownerRole: "shared",
   });
@@ -85,7 +85,7 @@ export function SuitcasePlanner({
     ...(partnerName?.trim()
       ? [{ id: "partner" as const, label: partnerName }]
       : []),
-    { id: "shared", label: "Shared / gemeinsam" },
+    { id: "shared", label: "Gemeinsam" },
   ];
 
   return (
@@ -94,7 +94,7 @@ export function SuitcasePlanner({
         <div>
           <h3 className="font-display text-lg text-stone-900">Koffer</h3>
           <p className="text-sm text-stone-500">
-            Anzahl und Größe festlegen — hilft bei Cross-Packing und
+            Anzahl und Grösse festlegen — hilft bei Koffer-Aufteilung und
             Gepäckverlust.
           </p>
         </div>
@@ -122,7 +122,7 @@ export function SuitcasePlanner({
               </div>
             </div>
             <div>
-              <Label>Größe</Label>
+              <Label>Grösse</Label>
               <div className="flex flex-wrap gap-1.5">
                 {SUITCASE_SIZES.map((s) => (
                   <button
@@ -176,7 +176,7 @@ export function SuitcasePlanner({
         ))}
       </div>
       <p className="text-xs text-stone-500">
-        {plans.length} Koffer · Größen:{" "}
+        {plans.length} Koffer · Grössen:{" "}
         {SUITCASE_SIZES.map((s) => `${s.label}=${s.hint}`).join(" · ")}
       </p>
     </div>

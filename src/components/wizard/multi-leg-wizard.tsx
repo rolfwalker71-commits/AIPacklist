@@ -22,16 +22,16 @@ const WEATHER: { id: WeatherTag; label: string }[] = [
   { id: "cool_windy", label: "Kühl/Windig" },
   { id: "tropical", label: "Tropisch" },
   { id: "uncertain", label: "Ungewiss" },
-  { id: "hot", label: "Heiß" },
+  { id: "hot", label: "Heiss" },
   { id: "cold", label: "Kalt" },
   { id: "rainy", label: "Regnerisch" },
 ];
 
 const DRESS: { id: DressCode; label: string }[] = [
-  { id: "gala", label: "Gala" },
-  { id: "casual", label: "Casual" },
+  { id: "gala", label: "Festlich / Gala" },
+  { id: "casual", label: "Lässig" },
   { id: "sport", label: "Sport" },
-  { id: "smart_casual", label: "Smart Casual" },
+  { id: "smart_casual", label: "Smart lässig" },
 ];
 
 function emptyLeg(start: string, end: string): LegInput {
@@ -154,7 +154,7 @@ export function MultiLegWizard({ onSubmit, initial, busy, travelers }: Props) {
         {summary.galaEvents > 0 && (
           <>
             <span className="text-teal-700/50">·</span>
-            <span>{summary.galaEvents} Gala-Event(s)</span>
+            <span>{summary.galaEvents} Fest-/Gala-Abend(e)</span>
           </>
         )}
       </div>
@@ -351,13 +351,13 @@ export function MultiLegWizard({ onSubmit, initial, busy, travelers }: Props) {
 
       <div className="rounded-2xl border border-stone-200 bg-stone-50/80 p-4">
         <h4 className="mb-2 font-semibold text-stone-800">
-          Vorschau Calculator ({preview.length} Items)
+          Vorschau Berechnung ({preview.length} Einträge)
         </h4>
         <ul className="grid gap-1 text-sm text-stone-600 md:grid-cols-2">
           {preview.slice(0, 8).map((item) => (
             <li key={item.name}>
               {item.quantity}× {item.name}
-              {item.isShared ? " · shared" : ""}
+              {item.isShared ? " · gemeinsam" : ""}
             </li>
           ))}
           {preview.length > 8 && (

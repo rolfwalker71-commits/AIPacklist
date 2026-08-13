@@ -21,6 +21,11 @@ export default async function HomePage() {
           FlexiPack
         </div>
         <div className="flex gap-2">
+          <Link href="/settings">
+            <Button variant="ghost" size="sm">
+              KI
+            </Button>
+          </Link>
           <Link href="/join">
             <Button variant="outline" size="sm">
               Beitreten
@@ -39,14 +44,14 @@ export default async function HomePage() {
           <Waves className="h-24 w-24" />
         </div>
         <p className="text-xs font-semibold uppercase tracking-[0.25em] text-teal-100/80">
-          PWA · Desktop · Multi-User
+          App · Computer · Mehrbenutzend
         </p>
         <h1 className="mt-3 max-w-2xl font-display text-4xl leading-tight md:text-6xl">
           FlexiPack
         </h1>
         <p className="mt-4 max-w-xl text-base text-teal-50/85 md:text-lg">
-          Packlisten für Multi-Etappen-Reisen, Paare und Gruppen — mit
-          Wasch-Logik, Shared Items in Echtzeit.
+          Packlisten für Mehr-Etappen-Reisen, Paare und Gruppen — mit
+          Wasch-Logik und gemeinsamen Einträgen in Echtzeit.
         </p>
         <div className="mt-8 flex flex-wrap gap-3">
           <Link href="/create">
@@ -63,7 +68,7 @@ export default async function HomePage() {
               variant="outline"
               className="border-teal-200/40 bg-teal-950/20 text-teal-50 hover:bg-teal-950/40"
             >
-              Templates
+              Vorlagen
             </Button>
           </Link>
         </div>
@@ -73,18 +78,18 @@ export default async function HomePage() {
         {[
           {
             icon: Waves,
-            title: "3 Eingabe-Modi",
-            text: "Visual Wizard, Vibe Input und modulare Templates.",
+            title: "Drei Eingabearten",
+            text: "Etappen-Assistent, KI-Freitext und fertige Vorlagen.",
           },
           {
             icon: Users,
-            title: "Couple & Gruppe",
-            text: "Shared Items live abhaken — sichtbar für alle Mitreisenden.",
+            title: "Paar & Gruppe",
+            text: "Gemeinsame Einträge live abhaken — sichtbar für alle Mitreisenden.",
           },
           {
             icon: Luggage,
-            title: "Cross-Packing",
-            text: "Items auf Koffer verteilen für den Fall von Gepäckverlust.",
+            title: "Koffer-Aufteilung",
+            text: "Sachen auf Koffer verteilen, falls Gepäck verloren geht.",
           },
         ].map((f) => (
           <div
@@ -107,7 +112,7 @@ export default async function HomePage() {
         </div>
         {trips.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-stone-300 bg-white/50 px-6 py-12 text-center text-stone-500">
-            Noch keine Packlisten. Starte mit Wizard, Vibe Input oder Template.
+            Noch keine Packlisten. Starte mit Assistent, KI-Freitext oder Vorlage.
           </div>
         ) : (
           <ul className="grid gap-3 md:grid-cols-2">
@@ -122,11 +127,11 @@ export default async function HomePage() {
                   </div>
                   <div className="mt-1 text-sm text-stone-500">
                     {formatDate(trip.startDate)} – {formatDate(trip.endDate)} ·{" "}
-                    {trip._count.legs} Legs · {trip._count.items} Items ·{" "}
+                    {trip._count.legs} Etappen · {trip._count.items} Einträge ·{" "}
                     {trip._count.members} Personen
                   </div>
                   <div className="mt-2 text-xs text-teal-800">
-                    Invite {trip.inviteCode} · {trip.owner.name}
+                    Einladung {trip.inviteCode} · {trip.owner.name}
                   </div>
                 </Link>
               </li>

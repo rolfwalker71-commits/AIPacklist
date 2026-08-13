@@ -8,6 +8,7 @@ import {
   Users,
   Luggage,
   Share2,
+  Sparkles,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -73,6 +74,9 @@ export function TripWorkspace({ initialTrip }: { initialTrip: Trip }) {
   const [nameDraft, setNameDraft] = useState("");
   const [genderDraft, setGenderDraft] = useState<PackGender>("UNSPECIFIED");
   const [copied, setCopied] = useState(false);
+  const [aiBusy, setAiBusy] = useState(false);
+  const [aiTips, setAiTips] = useState<string[]>([]);
+  const [aiMessage, setAiMessage] = useState<string | null>(null);
 
   useEffect(() => {
     const u = ensureLocalUser();
@@ -216,6 +220,33 @@ export function TripWorkspace({ initialTrip }: { initialTrip: Trip }) {
     if (res.ok) setTrip(await res.json());
   };
 
+  const enrichWithAi = async () => {
+    setAiBusy(true);
+    setAiMessage(null);
+    try {
+      const res = await fetch(`/api/trips/${trip.id}/ai-enrich`, {
+        method: "POST",
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setAiMessage(data.error || "KI fehlgeschlagen");
+        return;
+      }
+      const { tips, added, ...tripData } = data;
+      setTrip(tripData);
+      setAiTips(tips || []);
+      setAiMessage(
+        added
+          ? `${added} KI-Einträge ergänzt`
+          : "Keine neuen KI-Einträge — Liste wirkt schon vollständig"
+      );
+    } catch {
+      setAiMessage("KI fehlgeschlagen");
+    } finally {
+      setAiBusy(false);
+    }
+  };
+
   const filtered = useMemo(() => {
     return trip.items.filter((item) => {
       if (filter === "open" && item.packedAt) return false;
@@ -242,7 +273,7 @@ export function TripWorkspace({ initialTrip }: { initialTrip: Trip }) {
     return Math.round((packed / total) * 100);
   }, [trip.items]);
 
-  const copyInvite = async () => {
+  const copyEinladung = async () => {
     const url = `${window.location.origin}/join?code=${trip.inviteCode}`;
     await navigator.clipboard.writeText(url);
     setCopied(true);
@@ -255,7 +286,7 @@ export function TripWorkspace({ initialTrip }: { initialTrip: Trip }) {
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-amber-800">
-              FlexiPack Trip
+              FlexiPack-Reise
             </p>
             <h1 className="font-display text-3xl text-stone-950 md:text-4xl">
               {trip.title}
@@ -266,12 +297,28 @@ export function TripWorkspace({ initialTrip }: { initialTrip: Trip }) {
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button variant="outline" onClick={copyInvite}>
+            <Button variant="secondary" onClick={enrichWithAi} disabled={aiBusy}>
+              <Sparkles className="h-4 w-4" />
+              {aiBusy ? "KI denkt…" : "Liste mit KI verfeinern"}
+            </Button>
+            <Button variant="outline" onClick={copyEinladung}>
               <Share2 className="h-4 w-4" />
-              {copied ? "Kopiert" : `Code ${trip.inviteCode}`}
+              {copied ? "Kopiert" : `Einladung ${trip.inviteCode}`}
             </Button>
           </div>
         </div>
+        {(aiMessage || aiTips.length > 0) && (
+          <div className="rounded-xl border border-teal-100 bg-teal-50/70 px-4 py-3 text-sm text-teal-950">
+            {aiMessage && <p className="font-medium">{aiMessage}</p>}
+            {aiTips.length > 0 && (
+              <ul className="mt-2 list-disc space-y-1 pl-5 text-teal-900/80">
+                {aiTips.map((t) => (
+                  <li key={t}>{t}</li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
 
         <div className="h-2 overflow-hidden rounded-full bg-stone-200">
           <div
@@ -312,18 +359,24 @@ export function TripWorkspace({ initialTrip }: { initialTrip: Trip }) {
                     style={{ background: m.user.color }}
                   />
                   {m.user.name}
-                  <span className="text-stone-400">{m.role}</span>
+                  <span className="text-stone-400">
+                    {m.role === "OWNER"
+                      ? "Besitzer:in"
+                      : m.role === "PARTNER"
+                        ? "Mitreisende:r"
+                        : m.role}
+                  </span>
                 </span>
               ))}
             </div>
           </div>
           <div>
             <Label className="flex items-center gap-1">
-              <Link2 className="h-3 w-3" /> Invite
+              <Link2 className="h-3 w-3" /> Einladung
             </Label>
             <p className="mt-2 text-sm text-stone-600">
-              Partner:in mit Code <strong>{trip.inviteCode}</strong> beitreten.
-              Shared Items erscheinen live als „Gepackt von …“.
+              Mitreisende:r mit Code <strong>{trip.inviteCode}</strong> beitreten.
+              Gemeinsame Einträge erscheinen live als „Gepackt von …“.
             </p>
           </div>
         </div>
@@ -336,7 +389,13 @@ export function TripWorkspace({ initialTrip }: { initialTrip: Trip }) {
             className="rounded-2xl border border-teal-100 bg-gradient-to-br from-teal-50 to-white p-4"
           >
             <div className="text-xs font-semibold uppercase tracking-wide text-teal-800">
-              {leg.transport}
+              {({
+                SHIP: "Schiff",
+                FLIGHT: "Flug",
+                CAR: "Auto",
+                TRAIN: "Zug",
+                OTHER: "Sonstiges",
+              } as Record<string, string>)[leg.transport] || leg.transport}
             </div>
             <h3 className="mt-1 font-semibold text-stone-900">{leg.name}</h3>
             <p className="mt-1 text-xs text-stone-500">
@@ -357,7 +416,7 @@ export function TripWorkspace({ initialTrip }: { initialTrip: Trip }) {
               ["all", "Alle"],
               ["open", "Offen"],
               ["packed", "Gepackt"],
-              ["shared", "Shared"],
+              ["shared", "Gemeinsam"],
             ] as const
           ).map(([id, label]) => (
             <button
@@ -411,8 +470,8 @@ export function TripWorkspace({ initialTrip }: { initialTrip: Trip }) {
                     <div className="min-w-0 flex-1">
                       <div className="text-sm font-semibold">{s.name}</div>
                       <div className="text-xs text-stone-500">
-                        {packed}/{count} Items
-                        {s.isShared ? " · Shared" : ""}
+                        {packed}/{count} Einträge
+                        {s.isShared ? " · Gemeinsam" : ""}
                       </div>
                       <select
                         className="mt-2 w-full rounded-lg border border-stone-200 bg-white px-2 py-1.5 text-xs"
@@ -471,7 +530,7 @@ export function TripWorkspace({ initialTrip }: { initialTrip: Trip }) {
                           ? "border-teal-700 bg-teal-700 text-white"
                           : "border-stone-300 bg-white text-transparent"
                       )}
-                      aria-label="Toggle packed"
+                      aria-label="Als gepackt markieren"
                     >
                       <Check className="h-4 w-4" />
                     </button>
@@ -480,7 +539,7 @@ export function TripWorkspace({ initialTrip }: { initialTrip: Trip }) {
                         {item.quantity}× {item.name}
                         {item.isShared && (
                           <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-900">
-                            Shared
+                            Gemeinsam
                           </span>
                         )}
                       </div>

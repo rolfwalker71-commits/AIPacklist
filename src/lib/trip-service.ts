@@ -59,7 +59,7 @@ function defaultPlans(
   }
   plans.push({
     id: "auto-shared",
-    name: "Handgepäck / Shared",
+    name: "Handgepäck / Gemeinsam",
     size: "CABIN",
     ownerRole: "shared",
   });

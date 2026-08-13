@@ -1,18 +1,20 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { DatePicker } from "@/components/ui/date-picker";
-import type { TripDraft } from "@/lib/types";
+import type { TravelerProfile, TripDraft } from "@/lib/types";
+import Link from "next/link";
 
 interface Props {
   onParsed: (draft: TripDraft) => void;
+  travelers?: TravelerProfile[];
 }
 
-export function VibeInput({ onParsed }: Props) {
+export function VibeInput({ onParsed, travelers }: Props) {
   const [prompt, setPrompt] = useState(
     "13 Tage Transatlantik im Oktober ohne Wäsche, danach 5 Tage Florida"
   );
@@ -20,6 +22,14 @@ export function VibeInput({ onParsed }: Props) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [summary, setSummary] = useState<string | null>(null);
+  const [aiConfigured, setAiConfigured] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    fetch("/api/ai/settings")
+      .then((r) => r.json())
+      .then((d) => setAiConfigured(Boolean(d.configured)))
+      .catch(() => setAiConfigured(false));
+  }, []);
 
   const parse = async () => {
     setBusy(true);
@@ -28,12 +38,19 @@ export function VibeInput({ onParsed }: Props) {
       const res = await fetch("/api/parse", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt, startDate: startDate || undefined }),
+        body: JSON.stringify({
+          prompt,
+          startDate: startDate || undefined,
+          travelers,
+        }),
       });
-      if (!res.ok) throw new Error("Parse failed");
+      if (!res.ok) throw new Error("Auswertung fehlgeschlagen");
       const data = await res.json();
+      const engine =
+        data.parseSource === "openai" ? "KI (OpenAI)" : "Regelparser (Ersatz)";
       setSummary(
-        `${data.draft.legs.length} Etappen · ${data.summary.daysWithoutLaundry} Tage ohne Wäsche · ${data.preview.length} Items`
+        `${engine} · ${data.draft.legs.length} Etappen · ${data.summary.daysWithoutLaundry} Tage ohne Wäsche · ${data.preview.length} Einträge` +
+          (data.tips?.length ? ` · ${data.tips.length} KI-Tipps` : "")
       );
       onParsed(data.draft);
     } catch (e) {
@@ -47,14 +64,28 @@ export function VibeInput({ onParsed }: Props) {
     <div className="space-y-4">
       <div className="flex items-center gap-2 text-teal-900">
         <Sparkles className="h-5 w-5" />
-        <h3 className="font-display text-xl">Vibe Input</h3>
+        <h3 className="font-display text-xl">KI-Freitext</h3>
       </div>
       <p className="text-sm text-stone-600">
-        Beschreibe deine Reise in natürlicher Sprache — FlexiPack zerlegt sie in
-        Etappen mit Wetter-, Wäsche- und Dresscode-Logik.
+        Beschreibe deine Reise in natürlicher Sprache — mit API-Schlüssel zerlegt die KI die Etappen; ohne Schlüssel greift der Regelparser.
       </p>
+      <div className="rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 text-xs text-stone-600">
+        {aiConfigured === null
+          ? "KI-Status wird geladen…"
+          : aiConfigured
+            ? "KI aktiv (OpenAI)"
+            : (
+              <>
+                KI inaktiv — Schlüssel unter{" "}
+                <Link href="/settings" className="font-semibold text-teal-800">
+                  Einstellungen
+                </Link>{" "}
+                hinterlegen.
+              </>
+            )}
+      </div>
       <div>
-        <Label>Optionaler Starttermin</Label>
+        <Label>Freiwilliger Starttermin</Label>
         <DatePicker
           value={startDate}
           onChange={setStartDate}
@@ -72,7 +103,7 @@ export function VibeInput({ onParsed }: Props) {
       {error && <p className="text-sm text-rose-700">{error}</p>}
       {summary && <p className="text-sm text-teal-800">{summary}</p>}
       <Button onClick={parse} disabled={busy || !prompt.trim()}>
-        {busy ? "Parse…" : "In Etappen umwandeln"}
+        {busy ? "KI wertet aus…" : "In Etappen umwandeln"}
       </Button>
     </div>
   );

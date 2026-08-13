@@ -11,7 +11,7 @@ const outfit = Outfit({
 export const metadata: Metadata = {
   title: "FlexiPack — Flexible Reise-Packlisten",
   description:
-    "PWA für Multi-Etappen-Reisen, Paare & Gruppen. Dynamische Mengen, Shared Items, Koffer-Kollaboration.",
+    "App für Mehr-Etappen-Reisen, Paare und Gruppen. Dynamische Mengen, gemeinsame Einträge, Koffer-Aufteilung.",
   applicationName: "FlexiPack",
   manifest: "/manifest.webmanifest",
   appleWebApp: {
@@ -34,7 +34,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="de" className={`${outfit.variable} ${outfit.className}`}>
+    <html lang="de-CH" className={`${outfit.variable} ${outfit.className}`}>
       <body className="font-sans antialiased">
         <div className="app-shell min-h-screen">
           <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
