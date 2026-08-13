@@ -15,6 +15,7 @@ function iso(d: Date) {
 
 type AiLeg = {
   name: string;
+  location?: string | null;
   startDate: string;
   endDate: string;
   transport: Transport;
@@ -49,6 +50,7 @@ function sanitizeLeg(raw: AiLeg, fallbackStart: Date): LegInput | null {
   if (!isValid(start) || !isValid(end)) return null;
   return {
     name: String(raw.name || "Etappe").slice(0, 80),
+    location: raw.location ? String(raw.location).slice(0, 80) : null,
     startDate: iso(start),
     endDate: iso(end < start ? start : end),
     transport: TRANSPORTS.includes(raw.transport) ? raw.transport : "OTHER",
@@ -86,6 +88,7 @@ Antworte NUR als JSON mit:
   "endDate": "YYYY-MM-DD",
   "legs": [{
     "name": string,
+    "location": string|null,
     "startDate": "YYYY-MM-DD",
     "endDate": "YYYY-MM-DD",
     "transport": "SHIP"|"FLIGHT"|"CAR"|"TRAIN"|"OTHER",
@@ -98,6 +101,7 @@ Antworte NUR als JSON mit:
 }
 Regeln:
 - Etappen lückenlos und chronologisch.
+- location = ungefährer Ort/Region (Florida, Karibik, Transatlantik, Europa, Mittelmeer …).
 - Wenn Start datum vorgegeben ist, daran halten.
 - Ohne Wäsche explizit laundryAvailable=false.
 - Kreuzfahrt/Schiff => SHIP; erkenne Gala, Atlantik/Oktober => cool_windy/uncertain.

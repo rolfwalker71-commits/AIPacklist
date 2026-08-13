@@ -19,7 +19,21 @@ type AiPackResponse = {
     priority?: string;
   }[];
   tips?: string[];
+  guides?: { title?: string; body?: string }[];
 };
+
+function mapGuides(
+  raw: AiPackResponse["guides"]
+): { title: string; body: string }[] {
+  return (raw || [])
+    .filter((g) => g && (g.title || g.body))
+    .map((g) => ({
+      title: String(g.title || "Reisetipp").slice(0, 120),
+      body: String(g.body || "").slice(0, 4000),
+    }))
+    .filter((g) => g.body.length > 20)
+    .slice(0, 8);
+}
 
 /** Hard safety net — never let these become "gemeinsam". */
 const ALWAYS_PERSONAL = [
@@ -132,6 +146,7 @@ export async function buildPackList(args: {
 }): Promise<{
   items: CalculatedItem[];
   tips: string[];
+  guides: { title: string; body: string }[];
   source: "openai" | "rules";
   laundry: ReturnType<typeof summarizeLaundry>;
 }> {
@@ -151,6 +166,7 @@ export async function buildPackList(args: {
     return {
       items: calculatePackList(args.legs, travelers),
       tips: [],
+      guides: [],
       source: "rules",
       laundry,
     };
@@ -158,36 +174,26 @@ export async function buildPackList(args: {
 
   try {
     const ai = await aiJsonCompletion<AiPackResponse>({
-      system: `Du bist Packlisten-Experte für FlexiPack (Schweiz). Erstelle eine vollständige, praxisnahe Packliste.
+      system: `Du bist Packlisten- und Reise-Experte für FlexiPack (Schweiz). Erstelle eine vollständige Packliste PLUS ausführliche Reisetipps.
 
-Prinzipien (wichtiger als starre Listen):
-1) Persönlich (isShared=false, forTraveler=Name): alles was nur eine Person braucht oder mitführen muss.
-   Beispiele: Reisepass, Ausweis, Tickets/Bordkarten, ESTA/Visa, Zahnbürste, Medikamente, BH/Unterwäsche, Powerbank, Handy-Ladekabel, eigene Schuhe, eigene Abendgarderobe.
-2) Gemeinsam (isShared=true, forTraveler=null): nur wirklich Teilbares.
-   Beispiele: Zahnpasta, Duschgel, Sonnencreme, Schirm, Erste Hilfe, Kabinen-Organizer, Auto-Ladekabel.
-3) NIEMALS Reisepass/Tickets/ESTA/Zahnbürste als gemeinsam markieren.
-4) Mengen an Waschtagen und Etappen anpassen (siehe laundryStats).
-5) Pro Person eigene Kleidungsmengen; bei Paaren nicht alles doppelt als "gemeinsam" ablegen.
-6) Priorität (priority):
-   - EARLY: muss Tage/Wochen vorher erledigt werden (ESTA/Visa/Impfung/Versicherung/Formulare/Pass beantragen).
-   - DAY_OF: erst am Reisetag / kurz vorher (Bordkarte ausdrucken, Schlüssel, Geldbörse).
-   - NORMAL: normales Packen.
-7) Sprache: Schweizer Hochdeutsch (ss statt ß).
+Prinzipien Packliste:
+1) Persönlich (isShared=false, forTraveler=Name): Pass, Tickets, ESTA/Visa, Zahnbürste, Medikamente, Unterwäsche, Powerbank, Ladekabel, eigene Schuhe/Abendgarderobe.
+2) Gemeinsam (isShared=true): nur wirklich Teilbares (Zahnpasta, Duschgel, Sonnencreme, Schirm, Erste Hilfe).
+3) Priorität: EARLY (Formulare/Visa/Impfung), DAY_OF (Bordkarte/Schlüssel), NORMAL sonst.
+4) location der Etappen (Florida, Karibik, Transatlantik, Europa …) stark berücksichtigen: Klima, Formalitäten, typische Aktivitäten.
+5) Schweizer Hochdeutsch (ss statt ß).
+
+Zusätzlich:
+- tips: 8–15 kurze, konkrete Bullet-Tipps
+- guides: 3–6 längere Abschnitte (je 2–5 Sätze) zu Etappen/Regionen, z.B. ESTA/USA, Karibik-Inselhopping, Waschen an Bord, Gala, Wetter Transatlantik.
 
 JSON:
 {
-  "items": [{
-    "name": string,
-    "category": "Kleidung"|"Pflege"|"Dokumente"|"Technik"|"Schuhe"|"Festlich"|"Aktivität"|"Gesundheit"|"Accessoires"|"Freizeit"|"Reise"|"Sonstiges",
-    "quantity": number,
-    "isShared": boolean,
-    "notes": string,
-    "forTraveler": string|null,
-    "priority": "EARLY"|"NORMAL"|"DAY_OF"
-  }],
-  "tips": string[]
+  "items": [{ "name": string, "category": string, "quantity": number, "isShared": boolean, "notes": string, "forTraveler": string|null, "priority": "EARLY"|"NORMAL"|"DAY_OF" }],
+  "tips": string[],
+  "guides": [{ "title": string, "body": string }]
 }
-Ziel: 25–55 sinnvolle Einträge, max 6 Tipps.`,
+Ziel: 25–55 Items.`,
       user: JSON.stringify({
         legs: args.legs,
         travelers: travelers.map((t) => ({
@@ -200,10 +206,13 @@ Ziel: 25–55 sinnvolle Einträge, max 6 Tipps.`,
     });
 
     const items = mapAiItems(ai.items || [], travelers);
+    const tips = (ai.tips || []).slice(0, 15).map(String);
+    const guides = mapGuides(ai.guides);
     if (items.length < 8) {
       return {
         items: calculatePackList(args.legs, travelers),
-        tips: ai.tips || [],
+        tips,
+        guides,
         source: "rules",
         laundry,
       };
@@ -211,7 +220,8 @@ Ziel: 25–55 sinnvolle Einträge, max 6 Tipps.`,
 
     return {
       items,
-      tips: (ai.tips || []).slice(0, 6).map(String),
+      tips,
+      guides,
       source: "openai",
       laundry,
     };
@@ -219,6 +229,7 @@ Ziel: 25–55 sinnvolle Einträge, max 6 Tipps.`,
     return {
       items: calculatePackList(args.legs, travelers),
       tips: [],
+      guides: [],
       source: "rules",
       laundry,
     };
@@ -232,19 +243,19 @@ export async function enrichPackListWithAi(args: {
 }): Promise<{
   items: CalculatedItem[];
   tips: string[];
+  guides: { title: string; body: string }[];
   source: "openai" | "none";
 }> {
   if (!isAiConfigured()) {
-    return { items: [], tips: [], source: "none" };
+    return { items: [], tips: [], guides: [], source: "none" };
   }
 
   try {
     const ai = await aiJsonCompletion<AiPackResponse>({
-      system: `Du ergänzt eine bestehende FlexiPack-Packliste. Nur fehlende, sinnvolle Einträge.
-Persönlich: Pass, Tickets, ESTA, Zahnbürste, Powerbank, Ladekabel, Medikamente — nie gemeinsam.
-Gemeinsam: nur Zahnpasta, Sonnencreme, Schirm, Erste Hilfe, Organizer, Duschgel.
-priority: EARLY (Formulare/Visa/Impfung), NORMAL, DAY_OF (Bordkarte/Schlüssel).
-Schweizer Hochdeutsch. JSON wie {"items":[...], "tips":[...]}. Max 12 Items, max 5 Tipps.`,
+      system: `Du ergänzt eine FlexiPack-Packliste und lieferst ausführliche Reiseinfos.
+Nur fehlende Items. Persönlich vs gemeinsam wie üblich. location der Etappen nutzen.
+tips: 8–12 kurze Tipps. guides: 3–6 längere Regional-/Etappen-Tipps (2–5 Sätze).
+Schweizer Hochdeutsch. JSON: {"items":[...],"tips":[...],"guides":[{"title","body"}]}. Max 12 Items.`,
       user: JSON.stringify({
         legs: args.legs,
         travelers: args.travelers.map((t) => ({
@@ -271,10 +282,58 @@ Schweizer Hochdeutsch. JSON wie {"items":[...], "tips":[...]}. Max 12 Items, max
 
     return {
       items: items.slice(0, 12),
-      tips: (ai.tips || []).slice(0, 5).map(String),
+      tips: (ai.tips || []).slice(0, 15).map(String),
+      guides: mapGuides(ai.guides),
       source: "openai",
     };
   } catch {
-    return { items: [], tips: [], source: "none" };
+    return { items: [], tips: [], guides: [], source: "none" };
+  }
+}
+
+/** Only travel tips/guides — no pack items. */
+export async function buildTravelInsights(args: {
+  legs: LegInput[];
+  travelers: TravelerProfile[];
+  title?: string;
+}): Promise<{
+  tips: string[];
+  guides: { title: string; body: string }[];
+  source: "openai" | "none";
+}> {
+  if (!isAiConfigured()) {
+    return { tips: [], guides: [], source: "none" };
+  }
+
+  try {
+    const ai = await aiJsonCompletion<{
+      tips?: string[];
+      guides?: { title?: string; body?: string }[];
+    }>({
+      system: `Du bist Reiseberater für FlexiPack (Schweiz). Schreibe ausführliche, praxisnahe Tipps zu den gegebenen Etappen und Orten (location).
+Berücksichtige Klima, Formalitäten (ESTA/Visa), Gesundheit, Pack-Strategien, lokale Besonderheiten, Waschen, Transport.
+Schweizer Hochdeutsch (ss statt ß).
+JSON: {
+  "tips": string[] (10–18 kurze Tipps),
+  "guides": [{ "title": string, "body": string }] (4–8 längere Abschnitte, je 3–6 Sätze)
+}`,
+      user: JSON.stringify({
+        title: args.title,
+        legs: args.legs,
+        travelers: args.travelers.map((t) => ({
+          name: t.name,
+          gender: t.gender,
+        })),
+      }),
+      temperature: 0.45,
+    });
+
+    return {
+      tips: (ai.tips || []).slice(0, 18).map(String),
+      guides: mapGuides(ai.guides),
+      source: "openai",
+    };
+  } catch {
+    return { tips: [], guides: [], source: "none" };
   }
 }

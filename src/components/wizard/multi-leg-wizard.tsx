@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { DatePicker } from "@/components/ui/date-picker";
 import type { DressCode, LegInput, Transport, TravelerProfile, TripDraft, WeatherTag } from "@/lib/types";
 import { calculatePackList, summarizeLaundry } from "@/lib/calculator";
+import { LOCATION_PRESETS } from "@/lib/locations";
 import { cn } from "@/lib/utils";
 
 const TRANSPORTS: { id: Transport; label: string; icon: typeof Ship }[] = [
@@ -37,6 +38,7 @@ const DRESS: { id: DressCode; label: string }[] = [
 function emptyLeg(start: string, end: string): LegInput {
   return {
     name: "Etappe",
+    location: "",
     startDate: start,
     endDate: end,
     transport: "SHIP",
@@ -200,6 +202,38 @@ export function MultiLegWizard({ onSubmit, initial, busy, travelers }: Props) {
                   <Trash2 className="h-4 w-4 text-rose-600" />
                 </Button>
               )}
+            </div>
+
+            <div className="mb-4">
+              <Label>Ungefährer Ort / Region</Label>
+              <Input
+                value={leg.location || ""}
+                onChange={(e) => updateLeg(idx, { location: e.target.value })}
+                placeholder="z.B. Florida, Karibik, Transatlantik"
+                list={`leg-locations-${idx}`}
+              />
+              <datalist id={`leg-locations-${idx}`}>
+                {LOCATION_PRESETS.map((loc) => (
+                  <option key={loc} value={loc} />
+                ))}
+              </datalist>
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {LOCATION_PRESETS.slice(0, 6).map((loc) => (
+                  <button
+                    key={loc}
+                    type="button"
+                    onClick={() => updateLeg(idx, { location: loc })}
+                    className={cn(
+                      "rounded-full border px-2.5 py-0.5 text-[11px]",
+                      leg.location === loc
+                        ? "border-teal-700 bg-teal-800 text-white"
+                        : "border-stone-200 bg-white text-stone-600 hover:border-teal-300"
+                    )}
+                  >
+                    {loc}
+                  </button>
+                ))}
+              </div>
             </div>
 
             <div className="grid gap-3 md:grid-cols-2">

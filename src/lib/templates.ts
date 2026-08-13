@@ -35,6 +35,7 @@ export const TEMPLATES: PackTemplate[] = [
         legs: [
           {
             name: "Transatlantik-Kreuzfahrt",
+            location: "Transatlantik",
             startDate: iso(start),
             endDate: iso(cruiseEnd),
             transport: "SHIP",
@@ -44,6 +45,7 @@ export const TEMPLATES: PackTemplate[] = [
           },
           {
             name: "Landaufenthalt Florida",
+            location: "Florida",
             startDate: iso(addDays(cruiseEnd, 1)),
             endDate: iso(landEnd),
             transport: "FLIGHT",
@@ -73,6 +75,7 @@ export const TEMPLATES: PackTemplate[] = [
         legs: [
           {
             name: "Städtetrip kühl",
+            location: "Europa",
             startDate: iso(start),
             endDate: iso(mid),
             transport: "FLIGHT",
@@ -82,6 +85,7 @@ export const TEMPLATES: PackTemplate[] = [
           },
           {
             name: "Strand & Sonne",
+            location: "Mittelmeer",
             startDate: iso(addDays(mid, 1)),
             endDate: iso(end),
             transport: "FLIGHT",
@@ -112,6 +116,7 @@ export const TEMPLATES: PackTemplate[] = [
         legs: [
           {
             name: "Anreise & Küste",
+            location: "Europa",
             startDate: iso(start),
             endDate: iso(leg2),
             transport: "CAR",
@@ -121,6 +126,7 @@ export const TEMPLATES: PackTemplate[] = [
           },
           {
             name: "Nationalpark",
+            location: "Alpen",
             startDate: iso(addDays(leg2, 1)),
             endDate: iso(leg3),
             transport: "CAR",
@@ -131,6 +137,7 @@ export const TEMPLATES: PackTemplate[] = [
           },
           {
             name: "Rückweg Städte",
+            location: "Europa",
             startDate: iso(addDays(leg3, 1)),
             endDate: iso(end),
             transport: "CAR",

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { enrichPackListWithAi } from "@/lib/ai-pack";
+import { buildTravelInsights } from "@/lib/ai-pack";
 import {
   mergeInsights,
   parseAiInsights,
@@ -53,61 +53,28 @@ export async function POST(
       dressCodes: JSON.parse(leg.dressCodes) as never[],
     }));
 
-    const existing = trip.items.map((i) => ({
-      name: i.name,
-      category: i.category,
-      quantity: i.quantity,
-      isShared: i.isShared,
-      priority: i.priority as "EARLY" | "NORMAL" | "DAY_OF",
-      notes: i.notes || undefined,
-      source: (i.source as "calculator") || "calculator",
-    }));
-
-    const enriched = await enrichPackListWithAi({
+    const insights = await buildTravelInsights({
       legs,
       travelers,
-      existing,
+      title: trip.title,
     });
 
-    const sharedBag = trip.suitcases.find((s) => s.isShared);
-    const personalBags = trip.suitcases.filter((s) => !s.isShared);
-
-    for (const item of enriched.items) {
-      const owner =
-        !item.isShared && item.assigneeKey
-          ? travelers.find((t) => t.key === item.assigneeKey)
-          : undefined;
-      const suitcaseId = item.isShared
-        ? sharedBag?.id
-        : personalBags.find((b) => b.ownerUserId === owner?.key)?.id ||
-          personalBags[0]?.id ||
-          sharedBag?.id;
-
-      await prisma.packItem.create({
-        data: {
-          tripId,
-          name: item.name,
-          category: item.category,
-          quantity: item.quantity,
-          isShared: item.isShared,
-          priority: item.priority || "NORMAL",
-          notes: item.notes,
-          source: "ai",
-          suitcaseId: suitcaseId || null,
-        },
-      });
+    if (!insights.tips.length && !insights.guides.length) {
+      return NextResponse.json(
+        { error: "KI konnte keine Tipps erzeugen." },
+        { status: 502 }
+      );
     }
 
-    if (enriched.tips.length || enriched.guides.length) {
-      const next = mergeInsights(parseAiInsights(trip.aiInsights), {
-        tips: enriched.tips,
-        guides: enriched.guides,
-      });
-      await prisma.trip.update({
-        where: { id: tripId },
-        data: { aiInsights: stringifyAiInsights(next) },
-      });
-    }
+    const next = mergeInsights(parseAiInsights(trip.aiInsights), {
+      tips: insights.tips,
+      guides: insights.guides,
+    });
+
+    await prisma.trip.update({
+      where: { id: tripId },
+      data: { aiInsights: stringifyAiInsights(next) },
+    });
 
     const full = await prisma.trip.findUniqueOrThrow({
       where: { id: tripId },
@@ -117,17 +84,12 @@ export async function POST(
 
     return NextResponse.json({
       ...serializeTrip(full),
-      tips: enriched.tips,
-      guides: enriched.guides,
-      added: enriched.items.length,
+      source: insights.source,
     });
   } catch (e) {
-    console.error("ai-enrich failed", e);
+    console.error("ai-insights failed", e);
     const message =
-      e instanceof Error ? e.message : "Unbekannter KI-/Datenbankfehler";
-    return NextResponse.json(
-      { error: message.slice(0, 280) },
-      { status: 500 }
-    );
+      e instanceof Error ? e.message : "Unbekannter KI-Fehler";
+    return NextResponse.json({ error: message.slice(0, 280) }, { status: 500 });
   }
 }

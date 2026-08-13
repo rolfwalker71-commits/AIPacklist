@@ -91,6 +91,7 @@ function buildLegFromSegment(
 
   return {
     name: deriveLegName(seg, transport, idx),
+    location: detectLocation(seg),
     startDate: iso(start),
     endDate: iso(end),
     transport,
@@ -99,6 +100,18 @@ function buildLegFromSegment(
     weatherTags,
     dressCodes,
   };
+}
+
+function detectLocation(seg: string): string | null {
+  if (/transatlantik|transatlantic|atlantiküberquerung/i.test(seg))
+    return "Transatlantik";
+  if (/florida/i.test(seg)) return "Florida";
+  if (/karibik|caribbean/i.test(seg)) return "Karibik";
+  if (/mittelmeer|mediterranean/i.test(seg)) return "Mittelmeer";
+  if (/europa|europe|paris|rom|berlin|london/i.test(seg)) return "Europa";
+  if (/skandinavien|norwegen|schweden/i.test(seg)) return "Skandinavien";
+  if (/alpen|schweiz|österreich/i.test(seg)) return "Alpen";
+  return null;
 }
 
 function detectTransport(seg: string): Transport {

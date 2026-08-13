@@ -46,6 +46,7 @@ model Trip {
   startDate  DateTime
   endDate    DateTime
   inviteCode String   @unique
+  aiInsights String   @default("{}")
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
@@ -73,6 +74,7 @@ model TripMember {
 model Leg {
   id                  String    @id @default(cuid())
   name                String
+  location            String?
   startDate           DateTime
   endDate             DateTime
   transport           Transport @default(OTHER)

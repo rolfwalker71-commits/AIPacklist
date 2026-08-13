@@ -21,6 +21,8 @@ export interface TravelerProfile {
 
 export interface LegInput {
   name: string;
+  /** Rough region/destination, e.g. Florida, Karibik, Transatlantik */
+  location?: string | null;
   startDate: string; // ISO date
   endDate: string;
   transport: Transport;

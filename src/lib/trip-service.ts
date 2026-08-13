@@ -1,5 +1,6 @@
 import { prisma } from "./db";
 import { buildPackList } from "./ai-pack";
+import { stringifyAiInsights, parseAiInsights } from "./ai-insights";
 import { generateInviteCode, USER_COLORS } from "./utils";
 import type { PackGender, TripDraft } from "./types";
 import type { SuitcasePlan, SuitcaseSize } from "./suitcases";
@@ -100,7 +101,10 @@ export async function createTripFromDraft(
       : []),
   ];
 
-  const { items } = await buildPackList({ legs: draft.legs, travelers });
+  const { items, tips, guides } = await buildPackList({
+    legs: draft.legs,
+    travelers,
+  });
   const plans =
     suitcasePlans && suitcasePlans.length > 0
       ? suitcasePlans
@@ -124,6 +128,11 @@ export async function createTripFromDraft(
       endDate: new Date(draft.endDate),
       inviteCode,
       ownerId: user.id,
+      aiInsights: stringifyAiInsights({
+        tips,
+        guides,
+        updatedAt: new Date().toISOString(),
+      }),
       members: {
         create: [
           { userId: user.id, role: "OWNER" },
@@ -135,6 +144,7 @@ export async function createTripFromDraft(
       legs: {
         create: draft.legs.map((leg, idx) => ({
           name: leg.name,
+          location: leg.location?.trim() || null,
           startDate: new Date(leg.startDate),
           endDate: new Date(leg.endDate),
           transport: leg.transport,
@@ -240,8 +250,12 @@ export function serializeTrip(
     endDate: trip.endDate.toISOString(),
     createdAt: trip.createdAt.toISOString(),
     updatedAt: trip.updatedAt.toISOString(),
+    aiInsights: parseAiInsights(
+      (trip as { aiInsights?: string }).aiInsights
+    ),
     legs: trip.legs.map((leg) => ({
       ...leg,
+      location: (leg as { location?: string | null }).location || null,
       startDate: leg.startDate.toISOString(),
       endDate: leg.endDate.toISOString(),
       weatherTags: JSON.parse(leg.weatherTags) as string[],

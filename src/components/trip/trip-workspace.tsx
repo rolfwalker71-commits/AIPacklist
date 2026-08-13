@@ -11,18 +11,21 @@ import {
   Luggage,
   Share2,
   Sparkles,
-  Trash2,
   Clock,
+  ListChecks,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { GenderPicker } from "@/components/ui/gender-picker";
+import { DatePicker } from "@/components/ui/date-picker";
+import { SwipeRow } from "@/components/ui/swipe-row";
 import { cn, formatDate } from "@/lib/utils";
 import { ensureLocalUser, setLocalUser, type LocalUser } from "@/lib/local-user";
-import type { PackGender } from "@/lib/types";
+import type { PackGender, Transport } from "@/lib/types";
 import { SUITCASE_SIZES } from "@/lib/suitcases";
 import { SHARED_COLOR, tileStyle } from "@/lib/colors";
+import { LOCATION_PRESETS } from "@/lib/locations";
 import {
   priorityLabel,
   priorityRank,
@@ -59,22 +62,32 @@ type PackItem = {
   } | null;
 };
 
+type TripLeg = {
+  id: string;
+  name: string;
+  location?: string | null;
+  transport: string;
+  laundryAvailable: boolean;
+  weatherTags: string[];
+  dressCodes: string[];
+  startDate: string;
+  endDate: string;
+};
+
+type AiInsights = {
+  tips: string[];
+  guides: { title: string; body: string }[];
+  updatedAt?: string | null;
+};
+
 type Trip = {
   id: string;
   title: string;
   inviteCode: string;
   startDate: string;
   endDate: string;
-  legs: {
-    id: string;
-    name: string;
-    transport: string;
-    laundryAvailable: boolean;
-    weatherTags: string[];
-    dressCodes: string[];
-    startDate: string;
-    endDate: string;
-  }[];
+  aiInsights?: AiInsights;
+  legs: TripLeg[];
   items: PackItem[];
   suitcases: {
     id: string;
@@ -89,6 +102,49 @@ type Trip = {
     user: MemberUser;
   }[];
 };
+
+type TripTab = "pack" | "ai" | "people";
+
+const TRANSPORT_LABELS: Record<string, string> = {
+  SHIP: "Schiff",
+  FLIGHT: "Flug",
+  CAR: "Auto",
+  TRAIN: "Zug",
+  OTHER: "Sonstiges",
+};
+
+const TRANSPORT_OPTIONS: { id: Transport; label: string }[] = [
+  { id: "SHIP", label: "Schiff" },
+  { id: "FLIGHT", label: "Flug" },
+  { id: "CAR", label: "Auto" },
+  { id: "TRAIN", label: "Zug" },
+  { id: "OTHER", label: "Sonstiges" },
+];
+
+function emptyInsights(): AiInsights {
+  return { tips: [], guides: [], updatedAt: null };
+}
+
+function normalizeInsights(raw?: AiInsights | null): AiInsights {
+  if (!raw) return emptyInsights();
+  return {
+    tips: Array.isArray(raw.tips) ? raw.tips.map(String).filter(Boolean) : [],
+    guides: Array.isArray(raw.guides)
+      ? raw.guides
+          .filter((g) => g && typeof g === "object")
+          .map((g) => ({
+            title: String(g.title || "Hinweis"),
+            body: String(g.body || ""),
+          }))
+          .filter((g) => g.body)
+      : [],
+    updatedAt: raw.updatedAt ? String(raw.updatedAt) : null,
+  };
+}
+
+function toDateInput(iso: string): string {
+  return iso.slice(0, 10);
+}
 
 function resolveItemOwner(
   item: PackItem,
@@ -165,7 +221,6 @@ function openStats(items: PackItem[], trip: Trip): {
     map.set(key, cur);
   }
 
-  // Stable order: members first, then shared, then personal
   const buckets: OpenBucket[] = [];
   for (const m of trip.members) {
     const b = map.get(m.user.id);
@@ -198,8 +253,26 @@ function saveOpenSections(tripId: string, state: Record<string, boolean>) {
   localStorage.setItem(`flexipack_cats_open_${tripId}`, JSON.stringify(state));
 }
 
+function loadTab(tripId: string): TripTab {
+  if (typeof window === "undefined") return "pack";
+  try {
+    const raw = localStorage.getItem(`flexipack_trip_tab_${tripId}`);
+    if (raw === "pack" || raw === "ai" || raw === "people") return raw;
+  } catch {
+    // ignore
+  }
+  return "pack";
+}
+
+function saveTab(tripId: string, tab: TripTab) {
+  localStorage.setItem(`flexipack_trip_tab_${tripId}`, tab);
+}
+
 export function TripWorkspace({ initialTrip }: { initialTrip: Trip }) {
-  const [trip, setTrip] = useState(initialTrip);
+  const [trip, setTrip] = useState<Trip>(() => ({
+    ...initialTrip,
+    aiInsights: normalizeInsights(initialTrip.aiInsights),
+  }));
   const [user, setUser] = useState<LocalUser | null>(null);
   const [filter, setFilter] = useState<"all" | "open" | "packed" | "shared">(
     "all"
@@ -209,9 +282,19 @@ export function TripWorkspace({ initialTrip }: { initialTrip: Trip }) {
   const [genderDraft, setGenderDraft] = useState<PackGender>("UNSPECIFIED");
   const [copied, setCopied] = useState(false);
   const [aiBusy, setAiBusy] = useState(false);
-  const [aiTips, setAiTips] = useState<string[]>([]);
   const [aiMessage, setAiMessage] = useState<string | null>(null);
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({});
+  const [activeTab, setActiveTab] = useState<TripTab>("pack");
+  const [editingLegId, setEditingLegId] = useState<string | null>(null);
+  const [legDraft, setLegDraft] = useState({
+    name: "",
+    location: "",
+    startDate: "",
+    endDate: "",
+    transport: "OTHER" as Transport,
+    laundryAvailable: false,
+  });
+  const [legBusy, setLegBusy] = useState(false);
 
   useEffect(() => {
     const u = ensureLocalUser();
@@ -222,7 +305,13 @@ export function TripWorkspace({ initialTrip }: { initialTrip: Trip }) {
 
   useEffect(() => {
     setOpenSections(loadOpenSections(trip.id));
+    setActiveTab(loadTab(trip.id));
   }, [trip.id]);
+
+  const setTab = (tab: TripTab) => {
+    setActiveTab(tab);
+    saveTab(trip.id, tab);
+  };
 
   const toggleSection = (key: string) => {
     setOpenSections((prev) => {
@@ -261,7 +350,12 @@ export function TripWorkspace({ initialTrip }: { initialTrip: Trip }) {
         if (event.type === "member_joined" || event.type === "trip_updated") {
           fetch(`/api/trips/${trip.id}`)
             .then((r) => r.json())
-            .then(setTrip)
+            .then((data: Trip) =>
+              setTrip({
+                ...data,
+                aiInsights: normalizeInsights(data.aiInsights),
+              })
+            )
             .catch(() => undefined);
         }
       } catch {
@@ -287,7 +381,6 @@ export function TripWorkspace({ initialTrip }: { initialTrip: Trip }) {
     async (item: PackItem) => {
       if (!user) return;
       const packed = !item.packedAt;
-      // optimistic
       setTrip((prev) => ({
         ...prev,
         items: prev.items.map((i) =>
@@ -368,7 +461,10 @@ export function TripWorkspace({ initialTrip }: { initialTrip: Trip }) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ suitcaseId, size }),
     });
-    if (res.ok) setTrip(await res.json());
+    if (res.ok) {
+      const data = await res.json();
+      setTrip({ ...data, aiInsights: normalizeInsights(data.aiInsights) });
+    }
   };
 
   const addSuitcase = async () => {
@@ -381,7 +477,10 @@ export function TripWorkspace({ initialTrip }: { initialTrip: Trip }) {
         ownerUserId: user?.id,
       }),
     });
-    if (res.ok) setTrip(await res.json());
+    if (res.ok) {
+      const data = await res.json();
+      setTrip({ ...data, aiInsights: normalizeInsights(data.aiInsights) });
+    }
   };
 
   const removeSuitcase = async (suitcaseId: string) => {
@@ -389,7 +488,47 @@ export function TripWorkspace({ initialTrip }: { initialTrip: Trip }) {
       `/api/trips/${trip.id}/suitcases?suitcaseId=${suitcaseId}`,
       { method: "DELETE" }
     );
-    if (res.ok) setTrip(await res.json());
+    if (res.ok) {
+      const data = await res.json();
+      setTrip({ ...data, aiInsights: normalizeInsights(data.aiInsights) });
+    }
+  };
+
+  const applyTripPayload = (
+    data: Trip & {
+      tips?: string[];
+      guides?: AiInsights["guides"];
+      added?: number;
+      source?: string;
+      error?: string;
+    }
+  ) => {
+    const {
+      tips,
+      guides,
+      added: _added,
+      source: _source,
+      error: _error,
+      ...tripData
+    } = data;
+    if (tripData.aiInsights) {
+      setTrip({
+        ...tripData,
+        aiInsights: normalizeInsights(tripData.aiInsights),
+      });
+      return;
+    }
+    setTrip((prev) => ({
+      ...tripData,
+      aiInsights: normalizeInsights({
+        tips: Array.isArray(tips) && tips.length ? tips : prev.aiInsights?.tips || [],
+        guides:
+          Array.isArray(guides) && guides.length
+            ? guides
+            : prev.aiInsights?.guides || [],
+        updatedAt: new Date().toISOString(),
+      }),
+    }));
   };
 
   const enrichWithAi = async () => {
@@ -408,12 +547,10 @@ export function TripWorkspace({ initialTrip }: { initialTrip: Trip }) {
         );
         return;
       }
-      const { tips, added, ...tripData } = data;
-      setTrip(tripData);
-      setAiTips(tips || []);
+      applyTripPayload(data);
       setAiMessage(
-        added
-          ? `${added} KI-Einträge ergänzt`
+        data.added
+          ? `${data.added} KI-Einträge ergänzt`
           : "Keine neuen KI-Einträge — Liste wirkt schon vollständig"
       );
     } catch (e) {
@@ -422,6 +559,107 @@ export function TripWorkspace({ initialTrip }: { initialTrip: Trip }) {
       );
     } finally {
       setAiBusy(false);
+    }
+  };
+
+  const regenerateInsights = async () => {
+    setAiBusy(true);
+    setAiMessage(null);
+    try {
+      const res = await fetch(`/api/trips/${trip.id}/ai-insights`, {
+        method: "POST",
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setAiMessage(
+          typeof data.error === "string"
+            ? data.error
+            : `KI fehlgeschlagen (${res.status})`
+        );
+        return;
+      }
+      applyTripPayload(data);
+      setAiMessage("Reisetipps aktualisiert");
+    } catch (e) {
+      setAiMessage(
+        e instanceof Error ? e.message : "KI fehlgeschlagen (Netzwerk)"
+      );
+    } finally {
+      setAiBusy(false);
+    }
+  };
+
+  const startEditLeg = (leg: TripLeg) => {
+    setEditingLegId(leg.id);
+    setLegDraft({
+      name: leg.name,
+      location: leg.location || "",
+      startDate: toDateInput(leg.startDate),
+      endDate: toDateInput(leg.endDate),
+      transport: (TRANSPORT_OPTIONS.some((t) => t.id === leg.transport)
+        ? leg.transport
+        : "OTHER") as Transport,
+      laundryAvailable: leg.laundryAvailable,
+    });
+  };
+
+  const saveLeg = async () => {
+    if (!editingLegId || !legDraft.name.trim()) return;
+    setLegBusy(true);
+    try {
+      const res = await fetch(`/api/trips/${trip.id}/legs`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          legId: editingLegId,
+          name: legDraft.name.trim(),
+          location: legDraft.location.trim() || null,
+          startDate: legDraft.startDate,
+          endDate: legDraft.endDate,
+          transport: legDraft.transport,
+          laundryAvailable: legDraft.laundryAvailable,
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setAiMessage(
+          typeof data.error === "string"
+            ? data.error
+            : "Etappe konnte nicht gespeichert werden"
+        );
+        return;
+      }
+      const data = await res.json();
+      setTrip({ ...data, aiInsights: normalizeInsights(data.aiInsights) });
+      setEditingLegId(null);
+    } finally {
+      setLegBusy(false);
+    }
+  };
+
+  const deleteLeg = async (legId: string) => {
+    if (trip.legs.length <= 1) return;
+    setLegBusy(true);
+    try {
+      const res = await fetch(`/api/trips/${trip.id}/legs`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ legId }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setAiMessage(
+          typeof data.error === "string"
+            ? data.error
+            : "Etappe konnte nicht gelöscht werden"
+        );
+        return;
+      }
+      const data = await res.json();
+      setTrip({ ...data, aiInsights: normalizeInsights(data.aiInsights) });
+      if (editingLegId === legId) setEditingLegId(null);
+    } finally {
+      setLegBusy(false);
     }
   };
 
@@ -474,6 +712,9 @@ export function TripWorkspace({ initialTrip }: { initialTrip: Trip }) {
     [trip]
   );
 
+  const insights = normalizeInsights(trip.aiInsights);
+  const hasInsights = insights.tips.length > 0 || insights.guides.length > 0;
+
   const copyEinladung = async () => {
     const url = `${window.location.origin}/join?code=${trip.inviteCode}`;
     await navigator.clipboard.writeText(url);
@@ -495,88 +736,90 @@ export function TripWorkspace({ initialTrip }: { initialTrip: Trip }) {
     const pLabel = priorityLabel(priority);
 
     return (
-      <li
+      <SwipeRow
         key={item.id}
-        className="flex flex-col gap-2 rounded-xl border px-3 py-3 transition sm:flex-row sm:items-center"
-        style={tileStyle(color, Boolean(item.packedAt))}
+        actions={[
+          {
+            id: "remove",
+            label: "Entfernen",
+            tone: "danger",
+            onClick: () => removeItem(item.id),
+          },
+        ]}
       >
-        <div className="flex min-w-0 flex-1 items-start gap-2 sm:items-center">
-          {avatarUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={avatarUrl}
-              alt=""
-              className="mt-0.5 h-6 w-6 shrink-0 rounded-full object-cover ring-1 ring-black/5 sm:mt-0"
-            />
-          ) : null}
-          <button
-            type="button"
-            onClick={() => togglePacked(item)}
-            className={cn(
-              "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border",
-              item.packedAt
-                ? "border-teal-700 bg-teal-700 text-white"
-                : "border-stone-300/80 bg-white/70 text-transparent"
-            )}
-            aria-label="Als gepackt markieren"
-          >
-            <Check className="h-4 w-4" />
-          </button>
-          <div className="min-w-0 flex-1">
-            <div className="font-medium text-stone-900">
-              {item.quantity}× {item.name}
-              {pLabel && (
-                <span
-                  className={cn(
-                    "ml-2 rounded-full px-2 py-0.5 text-[10px] font-semibold tracking-wide",
-                    priority === "EARLY"
-                      ? "bg-sky-100/90 text-sky-900"
-                      : "bg-stone-200/80 text-stone-700"
-                  )}
-                >
-                  {pLabel}
-                </span>
+        <li
+          className="flex list-none flex-col gap-2 rounded-xl border px-3 py-3 transition sm:flex-row sm:items-center"
+          style={tileStyle(color, Boolean(item.packedAt))}
+        >
+          <div className="flex min-w-0 flex-1 items-start gap-2 sm:items-center">
+            {avatarUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={avatarUrl}
+                alt=""
+                className="mt-0.5 h-6 w-6 shrink-0 rounded-full object-cover ring-1 ring-black/5 sm:mt-0"
+              />
+            ) : null}
+            <button
+              type="button"
+              onClick={() => togglePacked(item)}
+              className={cn(
+                "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border",
+                item.packedAt
+                  ? "border-teal-700 bg-teal-700 text-white"
+                  : "border-stone-300/80 bg-white/70 text-transparent"
               )}
-              {item.isShared && (
-                <span className="ml-2 rounded-full bg-amber-100/90 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-900">
-                  Gemeinsam
-                </span>
-              )}
-            </div>
-            <div className="text-xs text-stone-500">
-              {item.notes}
-              {item.packedAt && item.packedBy && (
-                <span className="ml-1 font-medium text-teal-800">
-                  · Gepackt von {item.packedBy.name}
-                </span>
-              )}
+              aria-label="Als gepackt markieren"
+            >
+              <Check className="h-4 w-4" />
+            </button>
+            <div className="min-w-0 flex-1">
+              <div className="font-medium text-stone-900">
+                {item.quantity}× {item.name}
+                {pLabel && (
+                  <span
+                    className={cn(
+                      "ml-2 rounded-full px-2 py-0.5 text-[10px] font-semibold tracking-wide",
+                      priority === "EARLY"
+                        ? "bg-sky-100/90 text-sky-900"
+                        : "bg-stone-200/80 text-stone-700"
+                    )}
+                  >
+                    {pLabel}
+                  </span>
+                )}
+                {item.isShared && (
+                  <span className="ml-2 rounded-full bg-amber-100/90 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-900">
+                    Gemeinsam
+                  </span>
+                )}
+              </div>
+              <div className="text-xs text-stone-500">
+                {item.notes}
+                {item.packedAt && item.packedBy && (
+                  <span className="ml-1 font-medium text-teal-800">
+                    · Gepackt von {item.packedBy.name}
+                  </span>
+                )}
+              </div>
             </div>
           </div>
-        </div>
-        <div className="flex items-center gap-1.5 sm:ml-auto">
-          <select
-            className="rounded-lg border border-stone-200/80 bg-white/80 px-2 py-1.5 text-xs"
-            value={item.suitcaseId || ""}
-            onChange={(e) => moveSuitcase(item.id, e.target.value)}
-          >
-            {trip.suitcases.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name} (
-                {SUITCASE_SIZES.find((x) => x.id === s.size)?.label || s.size})
-              </option>
-            ))}
-          </select>
-          <button
-            type="button"
-            onClick={() => removeItem(item.id)}
-            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-stone-400 transition hover:bg-rose-50 hover:text-rose-600"
-            aria-label={`${item.name} entfernen`}
-            title="Nicht nötig — entfernen"
-          >
-            <Trash2 className="h-4 w-4" />
-          </button>
-        </div>
-      </li>
+          <div className="flex items-center gap-1.5 sm:ml-auto">
+            <select
+              className="rounded-lg border border-stone-200/80 bg-white/80 px-2 py-1.5 text-xs"
+              value={item.suitcaseId || ""}
+              onChange={(e) => moveSuitcase(item.id, e.target.value)}
+            >
+              {trip.suitcases.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name} (
+                  {SUITCASE_SIZES.find((x) => x.id === s.size)?.label || s.size})
+                </option>
+              ))}
+            </select>
+          </div>
+        </li>
+      </SwipeRow>
     );
   };
 
@@ -646,8 +889,14 @@ export function TripWorkspace({ initialTrip }: { initialTrip: Trip }) {
     );
   };
 
+  const tabs: { id: TripTab; label: string; icon: typeof ListChecks }[] = [
+    { id: "pack", label: "Packliste", icon: ListChecks },
+    { id: "ai", label: "AI Infos", icon: Sparkles },
+    { id: "people", label: "Benutzer / Koffer", icon: Users },
+  ];
+
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <header className="space-y-4">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
@@ -663,28 +912,12 @@ export function TripWorkspace({ initialTrip }: { initialTrip: Trip }) {
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button variant="secondary" onClick={enrichWithAi} disabled={aiBusy}>
-              <Sparkles className="h-4 w-4" />
-              {aiBusy ? "KI denkt…" : "Liste mit KI verfeinern"}
-            </Button>
             <Button variant="outline" onClick={copyEinladung}>
               <Share2 className="h-4 w-4" />
               {copied ? "Kopiert" : `Einladung ${trip.inviteCode}`}
             </Button>
           </div>
         </div>
-        {(aiMessage || aiTips.length > 0) && (
-          <div className="rounded-xl border border-teal-100 bg-teal-50/70 px-4 py-3 text-sm text-teal-950">
-            {aiMessage && <p className="font-medium">{aiMessage}</p>}
-            {aiTips.length > 0 && (
-              <ul className="mt-2 list-disc space-y-1 pl-5 text-teal-900/80">
-                {aiTips.map((t) => (
-                  <li key={t}>{t}</li>
-                ))}
-              </ul>
-            )}
-          </div>
-        )}
 
         <div className="h-2 overflow-hidden rounded-full bg-stone-200">
           <div
@@ -721,249 +954,529 @@ export function TripWorkspace({ initialTrip }: { initialTrip: Trip }) {
           )}
         </div>
 
-        <div className="grid gap-4 rounded-2xl border border-stone-200 bg-white/70 p-4 md:grid-cols-3">
-          <div className="space-y-3">
-            <div>
-              <Label>Dein Name</Label>
-              <div className="flex gap-2">
-                <Input
-                  value={nameDraft}
-                  onChange={(e) => setNameDraft(e.target.value)}
-                />
-                <Button variant="secondary" onClick={saveName}>
-                  Speichern
-                </Button>
-              </div>
-            </div>
-            <GenderPicker value={genderDraft} onChange={setGenderDraft} />
-            <div>
-              <Label>Avatar (freiwillig)</Label>
-              <input
-                type="file"
-                accept="image/*"
-                className="block w-full text-xs text-stone-600 file:mr-3 file:rounded-lg file:border-0 file:bg-teal-800 file:px-3 file:py-2 file:text-xs file:font-semibold file:text-white"
-                onChange={async (e) => {
-                  const file = e.target.files?.[0];
-                  if (!file || !user) return;
-                  const body = new FormData();
-                  body.append("file", file);
-                  body.append("userId", user.id);
-                  body.append("userName", nameDraft || user.name);
-                  body.append("userColor", user.color);
-                  const res = await fetch("/api/avatars", {
-                    method: "POST",
-                    body,
-                  });
-                  if (!res.ok) return;
-                  const data = await res.json();
-                  const next = { ...user, avatarUrl: data.avatarUrl };
-                  setLocalUser(next);
-                  setUser(next);
-                  await fetch(`/api/trips/${trip.id}/members`, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                      user: next,
-                      inviteCode: trip.inviteCode,
-                    }),
-                  });
-                  const tripRes = await fetch(`/api/trips/${trip.id}`);
-                  if (tripRes.ok) setTrip(await tripRes.json());
-                }}
-              />
-            </div>
-          </div>
-          <div>
-            <Label className="flex items-center gap-1">
-              <Users className="h-3 w-3" /> Mitreisende
-            </Label>
-            <div className="mt-2 flex flex-wrap gap-2">
-              {trip.members.map((m) => (
-                <span
-                  key={m.user.id}
-                  className="inline-flex items-center gap-2 rounded-full border border-stone-200 bg-stone-50 px-2 py-1 text-xs"
-                >
-                  {m.user.avatarUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={m.user.avatarUrl}
-                      alt=""
-                      className="h-5 w-5 rounded-full object-cover"
-                    />
-                  ) : (
-                    <span
-                      className="h-2.5 w-2.5 rounded-full"
-                      style={{ background: m.user.color }}
-                    />
-                  )}
-                  {m.user.name}
-                  <span className="text-stone-400">
-                    {m.role === "OWNER"
-                      ? "Besitzer:in"
-                      : m.role === "PARTNER"
-                        ? "Mitreisende:r"
-                        : m.role}
-                  </span>
-                </span>
-              ))}
-              <span className="inline-flex items-center gap-2 rounded-full border border-amber-200 bg-amber-50 px-2 py-1 text-xs text-amber-900">
-                <span
-                  className="h-2.5 w-2.5 rounded-full"
-                  style={{ background: SHARED_COLOR }}
-                />
-                Gemeinsam
-              </span>
-            </div>
-          </div>
-          <div>
-            <Label className="flex items-center gap-1">
-              <Link2 className="h-3 w-3" /> Einladung
-            </Label>
-            <p className="mt-2 text-sm text-stone-600">
-              Mitreisende:r mit Code <strong>{trip.inviteCode}</strong> beitreten.
-              Gemeinsame Einträge erscheinen live als „Gepackt von …“.
-            </p>
-          </div>
-        </div>
+        {aiMessage && (
+          <p className="rounded-lg border border-teal-100 bg-teal-50/70 px-3 py-2 text-sm text-teal-950">
+            {aiMessage}
+          </p>
+        )}
+
+        <nav className="flex flex-wrap gap-2" aria-label="Reise-Bereiche">
+          {tabs.map((tab) => {
+            const Icon = tab.icon;
+            const active = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setTab(tab.id)}
+                className={cn(
+                  "inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-semibold transition",
+                  active
+                    ? "border-teal-800 bg-teal-800 text-white"
+                    : "border-stone-200 bg-white text-stone-600 hover:border-stone-300"
+                )}
+              >
+                <Icon className="h-4 w-4" />
+                {tab.label}
+              </button>
+            );
+          })}
+        </nav>
       </header>
 
-      <section className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
-        {trip.legs.map((leg) => (
-          <div
-            key={leg.id}
-            className="rounded-2xl border border-teal-100 bg-gradient-to-br from-teal-50 to-white p-4"
-          >
-            <div className="text-xs font-semibold uppercase tracking-wide text-teal-800">
-              {({
-                SHIP: "Schiff",
-                FLIGHT: "Flug",
-                CAR: "Auto",
-                TRAIN: "Zug",
-                OTHER: "Sonstiges",
-              } as Record<string, string>)[leg.transport] || leg.transport}
-            </div>
-            <h3 className="mt-1 font-semibold text-stone-900">{leg.name}</h3>
-            <p className="mt-1 text-xs text-stone-500">
-              {formatDate(leg.startDate)} – {formatDate(leg.endDate)}
-            </p>
-            <p className="mt-2 text-xs text-stone-600">
-              Wäsche: {leg.laundryAvailable ? "Ja" : "Nein"} ·{" "}
-              {(leg.weatherTags || []).join(", ")}
-            </p>
-          </div>
-        ))}
-      </section>
-
-      <section className="space-y-4">
-        <div className="flex flex-wrap items-center gap-2">
-          {(
-            [
-              ["all", "Alle"],
-              ["open", "Offen"],
-              ["packed", "Gepackt"],
-              ["shared", "Gemeinsam"],
-            ] as const
-          ).map(([id, label]) => (
-            <button
-              key={id}
-              type="button"
-              onClick={() => setFilter(id)}
-              className={cn(
-                "rounded-full border px-3 py-1.5 text-xs font-semibold",
-                filter === id
-                  ? "border-teal-800 bg-teal-800 text-white"
-                  : "border-stone-200 bg-white text-stone-600"
-              )}
-            >
-              {label}
-            </button>
-          ))}
-          <select
-            className="ml-auto rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm"
-            value={suitcaseFilter}
-            onChange={(e) => setSuitcaseFilter(e.target.value)}
-          >
-            <option value="all">Alle Koffer</option>
-            {trip.suitcases.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
+      {activeTab === "pack" && (
+        <section className="space-y-4">
+          <div className="flex flex-wrap items-center gap-2">
+            {(
+              [
+                ["all", "Alle"],
+                ["open", "Offen"],
+                ["packed", "Gepackt"],
+                ["shared", "Gemeinsam"],
+              ] as const
+            ).map(([id, label]) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setFilter(id)}
+                className={cn(
+                  "rounded-full border px-3 py-1.5 text-xs font-semibold",
+                  filter === id
+                    ? "border-teal-800 bg-teal-800 text-white"
+                    : "border-stone-200 bg-white text-stone-600"
+                )}
+              >
+                {label}
+              </button>
             ))}
-          </select>
-        </div>
-
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h3 className="font-display text-lg text-stone-900">Koffer</h3>
-            <Button type="button" variant="secondary" size="sm" onClick={addSuitcase}>
-              Koffer hinzufügen
+            <select
+              className="ml-auto rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm"
+              value={suitcaseFilter}
+              onChange={(e) => setSuitcaseFilter(e.target.value)}
+            >
+              <option value="all">Alle Koffer</option>
+              {trip.suitcases.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+            </select>
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={enrichWithAi}
+              disabled={aiBusy}
+            >
+              <Sparkles className="h-3.5 w-3.5" />
+              {aiBusy ? "KI…" : "KI"}
             </Button>
           </div>
-          <div className="grid gap-3 md:grid-cols-3">
-            {trip.suitcases.map((s) => {
-              const count = trip.items.filter((i) => i.suitcaseId === s.id).length;
-              const packed = trip.items.filter(
-                (i) => i.suitcaseId === s.id && i.packedAt
-              ).length;
-              return (
-                <div
-                  key={s.id}
-                  className="rounded-xl border border-stone-200 bg-white/80 px-4 py-3"
-                >
-                  <div className="flex items-start gap-3">
-                    <Luggage className="mt-0.5 h-5 w-5 text-teal-800" />
-                    <div className="min-w-0 flex-1">
-                      <div className="text-sm font-semibold">{s.name}</div>
-                      <div className="text-xs text-stone-500">
-                        {packed}/{count} Einträge
-                        {s.isShared ? " · Gemeinsam" : ""}
+
+          <div className="space-y-2">
+            <h3 className="font-display text-lg text-stone-900">Etappen</h3>
+            <ul className="space-y-2">
+              {trip.legs.map((leg) => {
+                const actions = [
+                  {
+                    id: "edit",
+                    label: "Ändern",
+                    tone: "neutral" as const,
+                    onClick: () => startEditLeg(leg),
+                  },
+                  ...(trip.legs.length > 1
+                    ? [
+                        {
+                          id: "delete",
+                          label: "Löschen",
+                          tone: "danger" as const,
+                          onClick: () => deleteLeg(leg.id),
+                        },
+                      ]
+                    : []),
+                ];
+                return (
+                  <SwipeRow key={leg.id} actions={actions}>
+                    <li className="list-none rounded-xl border border-teal-100 bg-gradient-to-br from-teal-50 to-white px-4 py-3">
+                      <div className="text-xs font-semibold uppercase tracking-wide text-teal-800">
+                        {TRANSPORT_LABELS[leg.transport] || leg.transport}
                       </div>
-                      <select
-                        className="mt-2 w-full rounded-lg border border-stone-200 bg-white px-2 py-1.5 text-xs"
-                        value={s.size}
-                        onChange={(e) =>
-                          updateSuitcaseSize(s.id, e.target.value)
-                        }
-                      >
-                        {SUITCASE_SIZES.map((opt) => (
-                          <option key={opt.id} value={opt.id}>
-                            {opt.label} — {opt.hint}
-                          </option>
-                        ))}
-                      </select>
+                      <h4 className="mt-0.5 font-semibold text-stone-900">
+                        {leg.name}
+                      </h4>
+                      {leg.location && (
+                        <p className="text-xs text-stone-600">{leg.location}</p>
+                      )}
+                      <p className="mt-1 text-xs text-stone-500">
+                        {formatDate(leg.startDate)} – {formatDate(leg.endDate)}
+                      </p>
+                      <p className="mt-1 text-xs text-stone-600">
+                        Wäsche: {leg.laundryAvailable ? "Ja" : "Nein"}
+                        {(leg.weatherTags || []).length > 0
+                          ? ` · ${(leg.weatherTags || []).join(", ")}`
+                          : ""}
+                      </p>
+                    </li>
+                  </SwipeRow>
+                );
+              })}
+            </ul>
+
+            {editingLegId && (
+              <div className="rounded-2xl border border-stone-200 bg-white/90 p-4 shadow-sm">
+                <h4 className="font-display text-lg text-stone-900">
+                  Etappe ändern
+                </h4>
+                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                  <div className="sm:col-span-2">
+                    <Label htmlFor="leg-name">Name</Label>
+                    <Input
+                      id="leg-name"
+                      value={legDraft.name}
+                      onChange={(e) =>
+                        setLegDraft((d) => ({ ...d, name: e.target.value }))
+                      }
+                    />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <Label htmlFor="leg-location">Ort / Region</Label>
+                    <Input
+                      id="leg-location"
+                      value={legDraft.location}
+                      onChange={(e) =>
+                        setLegDraft((d) => ({ ...d, location: e.target.value }))
+                      }
+                      placeholder="z. B. Florida"
+                    />
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {LOCATION_PRESETS.map((preset) => (
+                        <button
+                          key={preset}
+                          type="button"
+                          onClick={() =>
+                            setLegDraft((d) => ({ ...d, location: preset }))
+                          }
+                          className={cn(
+                            "rounded-full border px-2.5 py-1 text-[11px] font-medium",
+                            legDraft.location === preset
+                              ? "border-teal-700 bg-teal-50 text-teal-900"
+                              : "border-stone-200 bg-stone-50 text-stone-600"
+                          )}
+                        >
+                          {preset}
+                        </button>
+                      ))}
                     </div>
-                    {trip.suitcases.length > 1 && (
-                      <button
-                        type="button"
-                        className="text-xs text-rose-600"
-                        onClick={() => removeSuitcase(s.id)}
-                      >
-                        Entfernen
-                      </button>
-                    )}
+                  </div>
+                  <div>
+                    <Label>Start</Label>
+                    <DatePicker
+                      value={legDraft.startDate}
+                      onChange={(iso) =>
+                        setLegDraft((d) => ({ ...d, startDate: iso }))
+                      }
+                    />
+                  </div>
+                  <div>
+                    <Label>Ende</Label>
+                    <DatePicker
+                      value={legDraft.endDate}
+                      onChange={(iso) =>
+                        setLegDraft((d) => ({ ...d, endDate: iso }))
+                      }
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="leg-transport">Transport</Label>
+                    <select
+                      id="leg-transport"
+                      className="mt-1 h-11 w-full rounded-xl border border-stone-300 bg-white/80 px-3 text-sm"
+                      value={legDraft.transport}
+                      onChange={(e) =>
+                        setLegDraft((d) => ({
+                          ...d,
+                          transport: e.target.value as Transport,
+                        }))
+                      }
+                    >
+                      {TRANSPORT_OPTIONS.map((t) => (
+                        <option key={t.id} value={t.id}>
+                          {t.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="flex items-end pb-1">
+                    <label className="inline-flex items-center gap-2 text-sm text-stone-700">
+                      <input
+                        type="checkbox"
+                        checked={legDraft.laundryAvailable}
+                        onChange={(e) =>
+                          setLegDraft((d) => ({
+                            ...d,
+                            laundryAvailable: e.target.checked,
+                          }))
+                        }
+                        className="h-4 w-4 rounded border-stone-300"
+                      />
+                      Wäsche verfügbar
+                    </label>
                   </div>
                 </div>
-              );
-            })}
-          </div>
-        </div>
-
-        <div className="space-y-3">
-          {earlyItems.length > 0 &&
-            renderSection(
-              EARLY_SECTION_KEY,
-              "Rechtzeitig vorbereiten",
-              earlyItems,
-              {
-                icon: "clock",
-                hint: "Formulare, Visa und Co. — besser Tage oder Wochen vorher erledigen.",
-              }
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <Button onClick={saveLeg} disabled={legBusy}>
+                    {legBusy ? "Speichern…" : "Speichern"}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setEditingLegId(null)}
+                    disabled={legBusy}
+                  >
+                    Abbrechen
+                  </Button>
+                </div>
+              </div>
             )}
-          {byCategory.map(([category, items]) =>
-            renderSection(category, category, items, { icon: "briefcase" })
+          </div>
+
+          <div className="space-y-3">
+            {earlyItems.length > 0 &&
+              renderSection(
+                EARLY_SECTION_KEY,
+                "Rechtzeitig vorbereiten",
+                earlyItems,
+                {
+                  icon: "clock",
+                  hint: "Formulare, Visa und Co. — besser Tage oder Wochen vorher erledigen.",
+                }
+              )}
+            {byCategory.map(([category, items]) =>
+              renderSection(category, category, items, { icon: "briefcase" })
+            )}
+          </div>
+        </section>
+      )}
+
+      {activeTab === "ai" && (
+        <section className="space-y-5">
+          <div className="flex flex-wrap gap-2">
+            <Button onClick={enrichWithAi} disabled={aiBusy}>
+              <Sparkles className="h-4 w-4" />
+              {aiBusy ? "KI denkt…" : "Liste mit KI verfeinern"}
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={regenerateInsights}
+              disabled={aiBusy}
+            >
+              <Sparkles className="h-4 w-4" />
+              Reisetipps neu generieren
+            </Button>
+          </div>
+
+          {!hasInsights ? (
+            <div className="rounded-2xl border border-dashed border-stone-300 bg-stone-50/60 px-4 py-8 text-center">
+              <p className="font-medium text-stone-800">
+                Noch keine AI-Infos gespeichert
+              </p>
+              <p className="mt-1 text-sm text-stone-500">
+                Verfeinere die Packliste oder generiere Reisetipps — sie bleiben
+                auf dieser Reise gespeichert.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-5">
+              {insights.tips.length > 0 && (
+                <div>
+                  <h3 className="font-display text-lg text-stone-900">Tipps</h3>
+                  <ul className="mt-2 list-disc space-y-1.5 pl-5 text-sm text-stone-700">
+                    {insights.tips.map((tip) => (
+                      <li key={tip}>{tip}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {insights.guides.length > 0 && (
+                <div className="space-y-4">
+                  <h3 className="font-display text-lg text-stone-900">Guides</h3>
+                  {insights.guides.map((guide) => (
+                    <article
+                      key={`${guide.title}-${guide.body.slice(0, 24)}`}
+                      className="rounded-xl border border-stone-200/80 bg-white/60 px-4 py-3"
+                    >
+                      <h4 className="font-semibold text-stone-900">
+                        {guide.title}
+                      </h4>
+                      {guide.body.split(/\n+/).map((para, idx) => (
+                        <p
+                          key={idx}
+                          className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-stone-600"
+                        >
+                          {para}
+                        </p>
+                      ))}
+                    </article>
+                  ))}
+                </div>
+              )}
+              {insights.updatedAt && (
+                <p className="text-xs text-stone-400">
+                  Aktualisiert: {formatDate(insights.updatedAt)}
+                </p>
+              )}
+            </div>
           )}
-        </div>
-      </section>
+        </section>
+      )}
+
+      {activeTab === "people" && (
+        <section className="space-y-6">
+          <div className="grid gap-4 rounded-2xl border border-stone-200 bg-white/70 p-4 md:grid-cols-3">
+            <div className="space-y-3">
+              <div>
+                <Label>Dein Name</Label>
+                <div className="flex gap-2">
+                  <Input
+                    value={nameDraft}
+                    onChange={(e) => setNameDraft(e.target.value)}
+                  />
+                  <Button variant="secondary" onClick={saveName}>
+                    Speichern
+                  </Button>
+                </div>
+              </div>
+              <GenderPicker value={genderDraft} onChange={setGenderDraft} />
+              <div>
+                <Label>Avatar (freiwillig)</Label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="block w-full text-xs text-stone-600 file:mr-3 file:rounded-lg file:border-0 file:bg-teal-800 file:px-3 file:py-2 file:text-xs file:font-semibold file:text-white"
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (!file || !user) return;
+                    const body = new FormData();
+                    body.append("file", file);
+                    body.append("userId", user.id);
+                    body.append("userName", nameDraft || user.name);
+                    body.append("userColor", user.color);
+                    const res = await fetch("/api/avatars", {
+                      method: "POST",
+                      body,
+                    });
+                    if (!res.ok) return;
+                    const data = await res.json();
+                    const next = { ...user, avatarUrl: data.avatarUrl };
+                    setLocalUser(next);
+                    setUser(next);
+                    await fetch(`/api/trips/${trip.id}/members`, {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({
+                        user: next,
+                        inviteCode: trip.inviteCode,
+                      }),
+                    });
+                    const tripRes = await fetch(`/api/trips/${trip.id}`);
+                    if (tripRes.ok) {
+                      const tripData = await tripRes.json();
+                      setTrip({
+                        ...tripData,
+                        aiInsights: normalizeInsights(tripData.aiInsights),
+                      });
+                    }
+                  }}
+                />
+              </div>
+            </div>
+            <div>
+              <Label className="flex items-center gap-1">
+                <Users className="h-3 w-3" /> Mitreisende
+              </Label>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {trip.members.map((m) => (
+                  <span
+                    key={m.user.id}
+                    className="inline-flex items-center gap-2 rounded-full border border-stone-200 bg-stone-50 px-2 py-1 text-xs"
+                  >
+                    {m.user.avatarUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={m.user.avatarUrl}
+                        alt=""
+                        className="h-5 w-5 rounded-full object-cover"
+                      />
+                    ) : (
+                      <span
+                        className="h-2.5 w-2.5 rounded-full"
+                        style={{ background: m.user.color }}
+                      />
+                    )}
+                    {m.user.name}
+                    <span className="text-stone-400">
+                      {m.role === "OWNER"
+                        ? "Besitzer:in"
+                        : m.role === "PARTNER"
+                          ? "Mitreisende:r"
+                          : m.role}
+                    </span>
+                  </span>
+                ))}
+                <span className="inline-flex items-center gap-2 rounded-full border border-amber-200 bg-amber-50 px-2 py-1 text-xs text-amber-900">
+                  <span
+                    className="h-2.5 w-2.5 rounded-full"
+                    style={{ background: SHARED_COLOR }}
+                  />
+                  Gemeinsam
+                </span>
+              </div>
+            </div>
+            <div>
+              <Label className="flex items-center gap-1">
+                <Link2 className="h-3 w-3" /> Einladung
+              </Label>
+              <p className="mt-2 text-sm text-stone-600">
+                Mitreisende:r mit Code <strong>{trip.inviteCode}</strong>{" "}
+                beitreten. Gemeinsame Einträge erscheinen live als „Gepackt von
+                …“.
+              </p>
+              <Button
+                className="mt-3"
+                variant="outline"
+                size="sm"
+                onClick={copyEinladung}
+              >
+                <Share2 className="h-3.5 w-3.5" />
+                {copied ? "Kopiert" : "Link kopieren"}
+              </Button>
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="font-display text-lg text-stone-900">Koffer</h3>
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={addSuitcase}
+              >
+                Koffer hinzufügen
+              </Button>
+            </div>
+            <div className="grid gap-3 md:grid-cols-3">
+              {trip.suitcases.map((s) => {
+                const count = trip.items.filter(
+                  (i) => i.suitcaseId === s.id
+                ).length;
+                const packed = trip.items.filter(
+                  (i) => i.suitcaseId === s.id && i.packedAt
+                ).length;
+                return (
+                  <div
+                    key={s.id}
+                    className="rounded-xl border border-stone-200 bg-white/80 px-4 py-3"
+                  >
+                    <div className="flex items-start gap-3">
+                      <Luggage className="mt-0.5 h-5 w-5 text-teal-800" />
+                      <div className="min-w-0 flex-1">
+                        <div className="text-sm font-semibold">{s.name}</div>
+                        <div className="text-xs text-stone-500">
+                          {packed}/{count} Einträge
+                          {s.isShared ? " · Gemeinsam" : ""}
+                        </div>
+                        <select
+                          className="mt-2 w-full rounded-lg border border-stone-200 bg-white px-2 py-1.5 text-xs"
+                          value={s.size}
+                          onChange={(e) =>
+                            updateSuitcaseSize(s.id, e.target.value)
+                          }
+                        >
+                          {SUITCASE_SIZES.map((opt) => (
+                            <option key={opt.id} value={opt.id}>
+                              {opt.label} — {opt.hint}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      {trip.suitcases.length > 1 && (
+                        <button
+                          type="button"
+                          className="text-xs text-rose-600"
+                          onClick={() => removeSuitcase(s.id)}
+                        >
+                          Entfernen
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </section>
+      )}
     </div>
   );
 }
