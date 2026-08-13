@@ -21,7 +21,6 @@ import { GenderPicker } from "@/components/ui/gender-picker";
 import { DatePicker } from "@/components/ui/date-picker";
 import { SwipeRow } from "@/components/ui/swipe-row";
 import { cn, formatDate } from "@/lib/utils";
-import { ensureLocalUser, setLocalUser, type LocalUser } from "@/lib/local-user";
 import type { PackGender, Transport } from "@/lib/types";
 import { SUITCASE_SIZES } from "@/lib/suitcases";
 import { SHARED_COLOR, tileStyle } from "@/lib/colors";
@@ -32,6 +31,16 @@ import {
   resolvePriority,
   type PackPriority,
 } from "@/lib/priority";
+
+type SessionUserProp = {
+  id: string;
+  name: string;
+  username: string;
+  role: string;
+  color: string;
+  gender: PackGender;
+  avatarUrl?: string | null;
+};
 
 type MemberUser = {
   id: string;
@@ -83,7 +92,14 @@ type AiInsights = {
 type Trip = {
   id: string;
   title: string;
+  ownerId?: string;
   inviteCode: string;
+  inviteEnabled?: boolean;
+  inviteExpiresAt?: string | null;
+  inviteMaxUses?: number | null;
+  inviteUseCount?: number;
+  inviteValid?: boolean;
+  inviteInvalidReason?: string | null;
   startDate: string;
   endDate: string;
   aiInsights?: AiInsights;
@@ -268,18 +284,26 @@ function saveTab(tripId: string, tab: TripTab) {
   localStorage.setItem(`flexipack_trip_tab_${tripId}`, tab);
 }
 
-export function TripWorkspace({ initialTrip }: { initialTrip: Trip }) {
+export function TripWorkspace({
+  initialTrip,
+  sessionUser,
+}: {
+  initialTrip: Trip;
+  sessionUser: SessionUserProp;
+}) {
   const [trip, setTrip] = useState<Trip>(() => ({
     ...initialTrip,
     aiInsights: normalizeInsights(initialTrip.aiInsights),
   }));
-  const [user, setUser] = useState<LocalUser | null>(null);
+  const [user, setUser] = useState<SessionUserProp>(sessionUser);
   const [filter, setFilter] = useState<"all" | "open" | "packed" | "shared">(
     "all"
   );
   const [suitcaseFilter, setSuitcaseFilter] = useState<string>("all");
-  const [nameDraft, setNameDraft] = useState("");
-  const [genderDraft, setGenderDraft] = useState<PackGender>("UNSPECIFIED");
+  const [nameDraft, setNameDraft] = useState(sessionUser.name);
+  const [genderDraft, setGenderDraft] = useState<PackGender>(
+    sessionUser.gender || "UNSPECIFIED"
+  );
   const [copied, setCopied] = useState(false);
   const [aiBusy, setAiBusy] = useState(false);
   const [aiMessage, setAiMessage] = useState<string | null>(null);
@@ -297,11 +321,10 @@ export function TripWorkspace({ initialTrip }: { initialTrip: Trip }) {
   const [legBusy, setLegBusy] = useState(false);
 
   useEffect(() => {
-    const u = ensureLocalUser();
-    setUser(u);
-    setNameDraft(u.name);
-    setGenderDraft(u.gender || "UNSPECIFIED");
-  }, []);
+    setUser(sessionUser);
+    setNameDraft(sessionUser.name);
+    setGenderDraft(sessionUser.gender || "UNSPECIFIED");
+  }, [sessionUser]);
 
   useEffect(() => {
     setOpenSections(loadOpenSections(trip.id));
@@ -366,14 +389,13 @@ export function TripWorkspace({ initialTrip }: { initialTrip: Trip }) {
   }, [trip.id]);
 
   const saveName = () => {
-    if (!user || !nameDraft.trim()) return;
+    if (!nameDraft.trim()) return;
     const next = { ...user, name: nameDraft.trim(), gender: genderDraft };
-    setLocalUser(next);
     setUser(next);
     fetch(`/api/trips/${trip.id}/members`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ user: next, inviteCode: trip.inviteCode }),
+      body: JSON.stringify({ user: next }),
     }).catch(() => undefined);
   };
 
@@ -716,11 +738,35 @@ export function TripWorkspace({ initialTrip }: { initialTrip: Trip }) {
   const hasInsights = insights.tips.length > 0 || insights.guides.length > 0;
 
   const copyEinladung = async () => {
+    if (trip.inviteValid === false) {
+      setAiMessage(trip.inviteInvalidReason || "Einladung ungültig");
+      return;
+    }
     const url = `${window.location.origin}/join?code=${trip.inviteCode}`;
     await navigator.clipboard.writeText(url);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
+
+  const patchInvite = async (body: Record<string, unknown>) => {
+    const res = await fetch(`/api/trips/${trip.id}/invite`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      setAiMessage(data.error || "Einladung konnte nicht geändert werden");
+      return;
+    }
+    setTrip({ ...data, aiInsights: normalizeInsights(data.aiInsights) });
+    setAiMessage("Einladung aktualisiert");
+  };
+
+  const isTripOwner =
+    trip.ownerId === user.id ||
+    trip.members.some((m) => m.user.id === user.id && m.role === "OWNER") ||
+    user.role === "ADMIN";
 
   const renderItem = (item: PackItem) => {
     const owner = resolveItemOwner(item, trip);
@@ -1328,14 +1374,12 @@ export function TripWorkspace({ initialTrip }: { initialTrip: Trip }) {
                     if (!res.ok) return;
                     const data = await res.json();
                     const next = { ...user, avatarUrl: data.avatarUrl };
-                    setLocalUser(next);
                     setUser(next);
                     await fetch(`/api/trips/${trip.id}/members`, {
                       method: "POST",
                       headers: { "Content-Type": "application/json" },
                       body: JSON.stringify({
                         user: next,
-                        inviteCode: trip.inviteCode,
                       }),
                     });
                     const tripRes = await fetch(`/api/trips/${trip.id}`);
@@ -1397,19 +1441,82 @@ export function TripWorkspace({ initialTrip }: { initialTrip: Trip }) {
                 <Link2 className="h-3 w-3" /> Einladung
               </Label>
               <p className="mt-2 text-sm text-stone-600">
-                Mitreisende:r mit Code <strong>{trip.inviteCode}</strong>{" "}
-                beitreten. Gemeinsame Einträge erscheinen live als „Gepackt von
-                …“.
+                Code <strong>{trip.inviteCode}</strong>
+                {trip.inviteExpiresAt && (
+                  <>
+                    {" "}
+                    · gültig bis {formatDate(trip.inviteExpiresAt)}
+                  </>
+                )}
+                {trip.inviteMaxUses != null && (
+                  <>
+                    {" "}
+                    · {trip.inviteUseCount ?? 0}/{trip.inviteMaxUses}× genutzt
+                  </>
+                )}
               </p>
-              <Button
-                className="mt-3"
-                variant="outline"
-                size="sm"
-                onClick={copyEinladung}
-              >
-                <Share2 className="h-3.5 w-3.5" />
-                {copied ? "Kopiert" : "Link kopieren"}
-              </Button>
+              {trip.inviteValid === false && (
+                <p className="mt-1 text-sm text-rose-700">
+                  {trip.inviteInvalidReason || "Einladung ungültig"}
+                </p>
+              )}
+              <p className="mt-2 text-xs text-stone-500">
+                Partner:in muss eingeloggt sein und den Code/Link verwenden.
+                Alte Codes verfallen beim Erneuern.
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={copyEinladung}
+                  disabled={trip.inviteValid === false}
+                >
+                  <Share2 className="h-3.5 w-3.5" />
+                  {copied ? "Kopiert" : "Link kopieren"}
+                </Button>
+                {isTripOwner && (
+                  <>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() =>
+                        patchInvite({ regenerate: true, singleUse: false })
+                      }
+                    >
+                      Code erneuern
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() =>
+                        patchInvite({ regenerate: true, singleUse: true })
+                      }
+                    >
+                      Einmal-Code
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => patchInvite({ extendDays: true })}
+                    >
+                      +30 Tage
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        patchInvite({
+                          inviteEnabled: !(trip.inviteEnabled !== false),
+                        })
+                      }
+                    >
+                      {trip.inviteEnabled === false
+                        ? "Einladung aktivieren"
+                        : "Einladung pausieren"}
+                    </Button>
+                  </>
+                )}
+              </div>
             </div>
           </div>
 

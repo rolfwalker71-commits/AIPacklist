@@ -1,8 +1,10 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { redirect, notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { serializeTrip, tripInclude } from "@/lib/trip-service";
 import { TripWorkspace } from "@/components/trip/trip-workspace";
+import { getSessionUser } from "@/lib/auth";
+import { userCanAccessTrip } from "@/lib/trip-access";
 
 export const dynamic = "force-dynamic";
 
@@ -11,7 +13,14 @@ export default async function TripPage({
 }: {
   params: Promise<{ tripId: string }>;
 }) {
+  const user = await getSessionUser();
+  if (!user) redirect("/login");
+
   const { tripId } = await params;
+  if (!(await userCanAccessTrip(user.id, tripId))) {
+    notFound();
+  }
+
   const trip = await prisma.trip.findUnique({
     where: { id: tripId },
     include: tripInclude,
@@ -24,7 +33,18 @@ export default async function TripPage({
         ← FlexiPack
       </Link>
       <div className="mt-4">
-        <TripWorkspace initialTrip={serializeTrip(trip)} />
+        <TripWorkspace
+          initialTrip={serializeTrip(trip)}
+          sessionUser={{
+            id: user.id,
+            name: user.name,
+            color: user.color,
+            gender: user.gender as "FEMALE" | "MALE" | "UNSPECIFIED",
+            avatarUrl: user.avatarUrl,
+            role: user.role,
+            username: user.username,
+          }}
+        />
       </div>
     </main>
   );

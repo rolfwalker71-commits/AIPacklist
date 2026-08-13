@@ -12,7 +12,7 @@ export type SwipeAction = {
 
 /**
  * Swipe left to reveal actions. Works with touch and mouse drag.
- * Vertical scrolling stays intact; horizontal drag past a small threshold opens.
+ * Actions stay fully covered until the front panel slides.
  */
 export function SwipeRow({
   children,
@@ -29,6 +29,7 @@ export function SwipeRow({
   const startOffset = useRef(0);
   const mode = useRef<"none" | "h" | "v">("none");
   const maxReveal = Math.min(72 * actions.length, 180);
+  const open = offset < -4;
 
   const endDrag = () => {
     if (mode.current === "h") {
@@ -60,11 +61,18 @@ export function SwipeRow({
 
   return (
     <div className={cn("relative overflow-hidden rounded-xl", className)}>
-      <div className="absolute inset-y-0 right-0 flex">
+      <div
+        className={cn(
+          "absolute inset-y-0 right-0 flex transition-opacity duration-150",
+          open ? "opacity-100" : "pointer-events-none opacity-0"
+        )}
+        aria-hidden={!open}
+      >
         {actions.map((a) => (
           <button
             key={a.id}
             type="button"
+            tabIndex={open ? 0 : -1}
             onClick={() => {
               setOffset(0);
               a.onClick();
@@ -79,7 +87,7 @@ export function SwipeRow({
         ))}
       </div>
       <div
-        className="relative touch-pan-y transition-transform duration-150 ease-out"
+        className="relative z-10 w-full touch-pan-y bg-white transition-transform duration-150 ease-out"
         style={{ transform: `translateX(${offset}px)` }}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}

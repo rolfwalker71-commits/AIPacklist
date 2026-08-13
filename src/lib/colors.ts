@@ -21,8 +21,10 @@ export function hexToRgba(hex: string, alpha: number): string {
 }
 
 export function tileStyle(color: string, packed?: boolean): CSSProperties {
+  const tint = hexToRgba(color, packed ? 0.14 : 0.07);
   return {
-    background: packed ? hexToRgba(color, 0.14) : hexToRgba(color, 0.07),
+    // Opaque white base so swipe actions never bleed through translucent tints
+    background: `linear-gradient(${tint}, ${tint}), #ffffff`,
     borderColor: hexToRgba(color, packed ? 0.35 : 0.22),
     boxShadow: `inset 3px 0 0 ${hexToRgba(color, 0.55)}`,
   };

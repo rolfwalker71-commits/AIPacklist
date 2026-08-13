@@ -43,6 +43,7 @@ yarn-error.log*
 /data/ai-settings.json
 /data/avatars/*
 !/data/avatars/.gitkeep
+/data/session-secret.txt
 
 # vercel
 .vercel

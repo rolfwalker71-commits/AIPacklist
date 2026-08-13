@@ -15,7 +15,6 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { GenderPicker } from "@/components/ui/gender-picker";
 import { cn } from "@/lib/utils";
-import { ensureLocalUser, setLocalUser } from "@/lib/local-user";
 import type { PackGender, TripDraft } from "@/lib/types";
 import type { SuitcasePlan } from "@/lib/suitcases";
 import { TEMPLATES } from "@/lib/templates";
@@ -33,15 +32,28 @@ export function CreateTripClient() {
   );
   const [draft, setDraft] = useState<TripDraft | null>(null);
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
-  const [ownerName, setOwnerName] = useState("Ben");
-  const [partnerName, setPartnerName] = useState("Anna");
-  const [ownerGender, setOwnerGender] = useState<PackGender>("MALE");
-  const [partnerGender, setPartnerGender] = useState<PackGender>("FEMALE");
+  const [ownerName, setOwnerName] = useState("");
+  const [partnerName, setPartnerName] = useState("");
+  const [ownerGender, setOwnerGender] = useState<PackGender>("UNSPECIFIED");
+  const [partnerGender, setPartnerGender] = useState<PackGender>("UNSPECIFIED");
   const [suitcasePlans, setSuitcasePlans] = useState<SuitcasePlan[]>(() =>
-    defaultSuitcasePlans("Ben", "Anna")
+    defaultSuitcasePlans("Du", "")
   );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch("/api/auth/me")
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.user) {
+          setOwnerName(d.user.name || "");
+          setOwnerGender(d.user.gender || "UNSPECIFIED");
+          setSuitcasePlans(defaultSuitcasePlans(d.user.name || "Du", ""));
+        }
+      })
+      .catch(() => undefined);
+  }, []);
 
   useEffect(() => {
     setSuitcasePlans((prev) => {
@@ -88,23 +100,14 @@ export function CreateTripClient() {
     setBusy(true);
     setError(null);
     try {
-      const local = ensureLocalUser();
-      const owner = {
-        ...local,
-        name: ownerName || local.name,
-        gender: ownerGender,
-      };
-      setLocalUser(owner);
-
       const res = await fetch("/api/trips", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           draft: finalDraft,
-          owner,
-          partner: partnerName
+          partner: partnerName.trim()
             ? {
-                name: partnerName,
+                name: partnerName.trim(),
                 color: "#1D4ED8",
                 gender: partnerGender,
               }
@@ -112,8 +115,21 @@ export function CreateTripClient() {
           suitcasePlans,
         }),
       });
-      if (!res.ok) throw new Error("Reise konnte nicht erstellt werden");
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "Reise konnte nicht erstellt werden");
+      }
       const trip = await res.json();
+      // Persist display name on account if changed
+      if (ownerName.trim()) {
+        await fetch(`/api/trips/${trip.id}/members`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            user: { name: ownerName.trim(), gender: ownerGender },
+          }),
+        }).catch(() => undefined);
+      }
       router.push(`/trip/${trip.id}`);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Fehler");

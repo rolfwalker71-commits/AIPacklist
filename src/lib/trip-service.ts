@@ -1,7 +1,12 @@
 import { prisma } from "./db";
 import { buildPackList } from "./ai-pack";
 import { stringifyAiInsights, parseAiInsights } from "./ai-insights";
-import { generateInviteCode, USER_COLORS } from "./utils";
+import {
+  allocateInviteCode,
+  defaultInviteExpiry,
+  serializeInvite,
+} from "./invite";
+import { USER_COLORS } from "./utils";
 import type { PackGender, TripDraft } from "./types";
 import type { SuitcasePlan, SuitcaseSize } from "./suitcases";
 
@@ -79,10 +84,7 @@ export async function createTripFromDraft(
   suitcasePlans?: SuitcasePlan[]
 ) {
   const user = await ensureUser(owner);
-  let inviteCode = generateInviteCode();
-  while (await prisma.trip.findUnique({ where: { inviteCode } })) {
-    inviteCode = generateInviteCode();
-  }
+  const inviteCode = await allocateInviteCode();
 
   const travelers = [
     {
@@ -127,6 +129,10 @@ export async function createTripFromDraft(
       startDate: new Date(draft.startDate),
       endDate: new Date(draft.endDate),
       inviteCode,
+      inviteEnabled: true,
+      inviteExpiresAt: defaultInviteExpiry(),
+      inviteMaxUses: null,
+      inviteUseCount: 0,
       ownerId: user.id,
       aiInsights: stringifyAiInsights({
         tips,
@@ -250,6 +256,15 @@ export function serializeTrip(
     endDate: trip.endDate.toISOString(),
     createdAt: trip.createdAt.toISOString(),
     updatedAt: trip.updatedAt.toISOString(),
+    ...serializeInvite({
+      inviteCode: trip.inviteCode,
+      inviteEnabled: (trip as { inviteEnabled?: boolean }).inviteEnabled ?? true,
+      inviteExpiresAt:
+        (trip as { inviteExpiresAt?: Date | null }).inviteExpiresAt ?? null,
+      inviteMaxUses:
+        (trip as { inviteMaxUses?: number | null }).inviteMaxUses ?? null,
+      inviteUseCount: (trip as { inviteUseCount?: number }).inviteUseCount ?? 0,
+    }),
     aiInsights: parseAiInsights(
       (trip as { aiInsights?: string }).aiInsights
     ),

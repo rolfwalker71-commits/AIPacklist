@@ -26,29 +26,55 @@ enum Gender {
   UNSPECIFIED
 }
 
+enum AppRole {
+  ADMIN
+  USER
+}
+
 model User {
-  id        String   @id @default(cuid())
-  name      String
-  color     String   @default("#0F766E")
-  avatarUrl String?
-  gender    Gender   @default(UNSPECIFIED)
-  createdAt DateTime @default(now())
+  id           String   @id @default(cuid())
+  name         String
+  username     String?  @unique
+  passwordHash String?
+  role         AppRole  @default(USER)
+  isActive     Boolean  @default(true)
+  color        String   @default("#0F766E")
+  avatarUrl    String?
+  gender       Gender   @default(UNSPECIFIED)
+  createdAt    DateTime @default(now())
 
   ownedTrips  Trip[]         @relation("TripOwner")
   memberships TripMember[]
   suitcases   Suitcase[]
   packedItems PackItem[]     @relation("PackedBy")
+  sessions    Session[]
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  tokenHash String   @unique
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 model Trip {
-  id         String   @id @default(cuid())
-  title      String
-  startDate  DateTime
-  endDate    DateTime
-  inviteCode String   @unique
-  aiInsights String   @default("{}")
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  id              String    @id @default(cuid())
+  title           String
+  startDate       DateTime
+  endDate         DateTime
+  inviteCode      String    @unique
+  inviteEnabled   Boolean   @default(true)
+  inviteExpiresAt DateTime?
+  inviteMaxUses   Int?
+  inviteUseCount  Int       @default(0)
+  aiInsights      String    @default("{}")
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   ownerId String
   owner   User   @relation("TripOwner", fields: [ownerId], references: [id])

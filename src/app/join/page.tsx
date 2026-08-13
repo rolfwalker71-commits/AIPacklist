@@ -1,23 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useState, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { GenderPicker } from "@/components/ui/gender-picker";
-import { ensureLocalUser, setLocalUser } from "@/lib/local-user";
-import type { PackGender } from "@/lib/types";
-import { USER_COLORS } from "@/lib/utils";
 
 function JoinForm() {
   const router = useRouter();
   const params = useSearchParams();
   const [code, setCode] = useState(params.get("code") || "");
-  const [name, setName] = useState("Anna");
-  const [gender, setGender] = useState<PackGender>("FEMALE");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -28,21 +21,16 @@ function JoinForm() {
       const find = await fetch(`/api/join?code=${encodeURIComponent(code)}`);
       if (!find.ok) throw new Error("Einladungscode ungültig");
       const trip = await find.json();
-      const local = ensureLocalUser();
-      const user = {
-        ...local,
-        name: name || local.name,
-        color: local.color === USER_COLORS[0] ? USER_COLORS[1] : local.color,
-        gender,
-      };
-      setLocalUser(user);
 
       const res = await fetch(`/api/trips/${trip.id}/members`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ inviteCode: code, user }),
+        body: JSON.stringify({ inviteCode: code }),
       });
-      if (!res.ok) throw new Error("Beitritt fehlgeschlagen");
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "Beitritt fehlgeschlagen");
+      }
       router.push(`/trip/${trip.id}`);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Fehler");
@@ -60,11 +48,10 @@ function JoinForm() {
           placeholder="ABC123"
         />
       </div>
-      <div>
-        <Label>Dein Name</Label>
-        <Input value={name} onChange={(e) => setName(e.target.value)} />
-      </div>
-      <GenderPicker value={gender} onChange={setGender} />
+      <p className="text-xs text-stone-500">
+        Du trittst mit deinem angemeldeten Konto bei. Partner:innen brauchen
+        ebenfalls ein vom Admin angelegtes Benutzerkonto.
+      </p>
       {error && <p className="text-sm text-rose-700">{error}</p>}
       <Button className="w-full" disabled={busy || !code} onClick={join}>
         Beitreten
@@ -82,13 +69,14 @@ export default function JoinPage() {
       <h1 className="mt-4 font-display text-3xl text-stone-950">
         Reise beitreten
       </h1>
-      <p className="mb-8 mt-1 text-stone-600">
-        Mit Einladungscode als Mitreisende:r einsteigen und gemeinsame Einträge
-        live mitpacken.
+      <p className="mt-2 text-stone-600">
+        Mit Einladungscode einer bestehenden Packliste beitreten.
       </p>
-      <Suspense>
-        <JoinForm />
-      </Suspense>
+      <div className="mt-8">
+        <Suspense fallback={<p className="text-sm text-stone-500">Laden…</p>}>
+          <JoinForm />
+        </Suspense>
+      </div>
     </main>
   );
 }
