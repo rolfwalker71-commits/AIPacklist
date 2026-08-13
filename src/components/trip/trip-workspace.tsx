@@ -4,11 +4,15 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Briefcase,
   Check,
+  ChevronDown,
+  ChevronRight,
   Link2,
   Users,
   Luggage,
   Share2,
   Sparkles,
+  Trash2,
+  Clock,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,6 +22,21 @@ import { cn, formatDate } from "@/lib/utils";
 import { ensureLocalUser, setLocalUser, type LocalUser } from "@/lib/local-user";
 import type { PackGender } from "@/lib/types";
 import { SUITCASE_SIZES } from "@/lib/suitcases";
+import { SHARED_COLOR, tileStyle } from "@/lib/colors";
+import {
+  priorityLabel,
+  priorityRank,
+  resolvePriority,
+  type PackPriority,
+} from "@/lib/priority";
+
+type MemberUser = {
+  id: string;
+  name: string;
+  color: string;
+  gender?: string;
+  avatarUrl?: string | null;
+};
 
 type PackItem = {
   id: string;
@@ -25,12 +44,19 @@ type PackItem = {
   category: string;
   quantity: number;
   isShared: boolean;
+  priority?: PackPriority;
   notes: string | null;
   packedAt: string | null;
   packedByUserId: string | null;
   suitcaseId: string | null;
-  packedBy?: { id: string; name: string; color: string } | null;
-  suitcase?: { id: string; name: string } | null;
+  packedBy?: MemberUser | null;
+  suitcase?: {
+    id: string;
+    name: string;
+    isShared?: boolean;
+    ownerUserId?: string | null;
+    owner?: MemberUser | null;
+  } | null;
 };
 
 type Trip = {
@@ -56,13 +82,121 @@ type Trip = {
     size: string;
     isShared: boolean;
     ownerUserId: string | null;
-    owner?: { name: string } | null;
+    owner?: MemberUser | null;
   }[];
   members: {
     role: string;
-    user: { id: string; name: string; color: string; gender?: string };
+    user: MemberUser;
   }[];
 };
+
+function resolveItemOwner(
+  item: PackItem,
+  trip: Trip
+):
+  | { kind: "shared" }
+  | { kind: "user"; user: MemberUser }
+  | { kind: "personal" } {
+  if (item.isShared) return { kind: "shared" };
+
+  const bag =
+    trip.suitcases.find((s) => s.id === item.suitcaseId) ||
+    (item.suitcase
+      ? trip.suitcases.find((s) => s.id === item.suitcase?.id)
+      : undefined);
+
+  if (bag && !bag.isShared && bag.ownerUserId) {
+    const u =
+      trip.members.find((m) => m.user.id === bag.ownerUserId)?.user ||
+      bag.owner ||
+      null;
+    if (u) return { kind: "user", user: u };
+  }
+
+  const noteMatch = item.notes?.match(/für\s+([^·]+)/i);
+  if (noteMatch) {
+    const name = noteMatch[1].trim().toLowerCase();
+    const u = trip.members.find((m) => m.user.name.toLowerCase() === name)?.user;
+    if (u) return { kind: "user", user: u };
+  }
+
+  if (trip.members.length === 1) {
+    return { kind: "user", user: trip.members[0].user };
+  }
+
+  return { kind: "personal" };
+}
+
+type OpenBucket = {
+  key: string;
+  label: string;
+  color: string;
+  open: number;
+};
+
+function openStats(items: PackItem[], trip: Trip): {
+  total: number;
+  openTotal: number;
+  buckets: OpenBucket[];
+} {
+  const map = new Map<string, OpenBucket>();
+
+  for (const item of items) {
+    if (item.packedAt) continue;
+    const owner = resolveItemOwner(item, trip);
+    let key: string;
+    let label: string;
+    let color: string;
+    if (owner.kind === "user") {
+      key = owner.user.id;
+      label = owner.user.name;
+      color = owner.user.color;
+    } else if (owner.kind === "shared") {
+      key = "shared";
+      label = "Gemeinsam";
+      color = SHARED_COLOR;
+    } else {
+      key = "personal";
+      label = "Persönlich";
+      color = "#78716c";
+    }
+    const cur = map.get(key) || { key, label, color, open: 0 };
+    cur.open += 1;
+    map.set(key, cur);
+  }
+
+  // Stable order: members first, then shared, then personal
+  const buckets: OpenBucket[] = [];
+  for (const m of trip.members) {
+    const b = map.get(m.user.id);
+    if (b) buckets.push(b);
+  }
+  if (map.has("shared")) buckets.push(map.get("shared")!);
+  if (map.has("personal")) buckets.push(map.get("personal")!);
+
+  return {
+    total: items.length,
+    openTotal: items.filter((i) => !i.packedAt).length,
+    buckets,
+  };
+}
+
+const EARLY_SECTION_KEY = "__early__";
+
+function loadOpenSections(tripId: string): Record<string, boolean> {
+  if (typeof window === "undefined") return {};
+  try {
+    const raw = localStorage.getItem(`flexipack_cats_open_${tripId}`);
+    if (!raw) return {};
+    return JSON.parse(raw) as Record<string, boolean>;
+  } catch {
+    return {};
+  }
+}
+
+function saveOpenSections(tripId: string, state: Record<string, boolean>) {
+  localStorage.setItem(`flexipack_cats_open_${tripId}`, JSON.stringify(state));
+}
 
 export function TripWorkspace({ initialTrip }: { initialTrip: Trip }) {
   const [trip, setTrip] = useState(initialTrip);
@@ -77,6 +211,7 @@ export function TripWorkspace({ initialTrip }: { initialTrip: Trip }) {
   const [aiBusy, setAiBusy] = useState(false);
   const [aiTips, setAiTips] = useState<string[]>([]);
   const [aiMessage, setAiMessage] = useState<string | null>(null);
+  const [openSections, setOpenSections] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     const u = ensureLocalUser();
@@ -86,12 +221,32 @@ export function TripWorkspace({ initialTrip }: { initialTrip: Trip }) {
   }, []);
 
   useEffect(() => {
+    setOpenSections(loadOpenSections(trip.id));
+  }, [trip.id]);
+
+  const toggleSection = (key: string) => {
+    setOpenSections((prev) => {
+      const next = { ...prev, [key]: !prev[key] };
+      saveOpenSections(trip.id, next);
+      return next;
+    });
+  };
+
+  const isSectionOpen = (key: string) => Boolean(openSections[key]);
+
+  useEffect(() => {
     const es = new EventSource(`/api/trips/${trip.id}/events`);
     es.onmessage = (msg) => {
       try {
         const event = JSON.parse(msg.data);
         if (event.type === "item_updated" && event.payload) {
           setTrip((prev) => {
+            if (event.payload.deleted) {
+              return {
+                ...prev,
+                items: prev.items.filter((i) => i.id !== event.itemId),
+              };
+            }
             const exists = prev.items.some((i) => i.id === event.itemId);
             const items = exists
               ? prev.items.map((i) =>
@@ -142,7 +297,12 @@ export function TripWorkspace({ initialTrip }: { initialTrip: Trip }) {
                 packedAt: packed ? new Date().toISOString() : null,
                 packedByUserId: packed ? user.id : null,
                 packedBy: packed
-                  ? { id: user.id, name: user.name, color: user.color }
+                  ? {
+                      id: user.id,
+                      name: user.name,
+                      color: user.color,
+                      avatarUrl: user.avatarUrl,
+                    }
                   : null,
               }
             : i
@@ -181,6 +341,18 @@ export function TripWorkspace({ initialTrip }: { initialTrip: Trip }) {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ itemId, suitcaseId }),
+    });
+  };
+
+  const removeItem = async (itemId: string) => {
+    setTrip((prev) => ({
+      ...prev,
+      items: prev.items.filter((i) => i.id !== itemId),
+    }));
+    await fetch(`/api/trips/${trip.id}/items`, {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ itemId }),
     });
   };
 
@@ -227,9 +399,13 @@ export function TripWorkspace({ initialTrip }: { initialTrip: Trip }) {
       const res = await fetch(`/api/trips/${trip.id}/ai-enrich`, {
         method: "POST",
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setAiMessage(data.error || "KI fehlgeschlagen");
+        setAiMessage(
+          typeof data.error === "string"
+            ? data.error
+            : `KI fehlgeschlagen (${res.status})`
+        );
         return;
       }
       const { tips, added, ...tripData } = data;
@@ -240,8 +416,10 @@ export function TripWorkspace({ initialTrip }: { initialTrip: Trip }) {
           ? `${added} KI-Einträge ergänzt`
           : "Keine neuen KI-Einträge — Liste wirkt schon vollständig"
       );
-    } catch {
-      setAiMessage("KI fehlgeschlagen");
+    } catch (e) {
+      setAiMessage(
+        e instanceof Error ? e.message : "KI fehlgeschlagen (Netzwerk)"
+      );
     } finally {
       setAiBusy(false);
     }
@@ -258,13 +436,31 @@ export function TripWorkspace({ initialTrip }: { initialTrip: Trip }) {
     });
   }, [trip.items, filter, suitcaseFilter]);
 
+  const sortItems = (a: PackItem, b: PackItem) => {
+    const pa = priorityRank(resolvePriority(a));
+    const pb = priorityRank(resolvePriority(b));
+    if (pa !== pb) return pa - pb;
+    return a.name.localeCompare(b.name, "de");
+  };
+
+  const earlyItems = useMemo(
+    () =>
+      filtered
+        .filter((i) => resolvePriority(i) === "EARLY")
+        .sort(sortItems),
+    [filtered]
+  );
+
   const byCategory = useMemo(() => {
     const map = new Map<string, PackItem[]>();
     for (const item of filtered) {
+      if (resolvePriority(item) === "EARLY") continue;
       if (!map.has(item.category)) map.set(item.category, []);
       map.get(item.category)!.push(item);
     }
-    return [...map.entries()];
+    return [...map.entries()].map(
+      ([cat, items]) => [cat, [...items].sort(sortItems)] as const
+    );
   }, [filtered]);
 
   const progress = useMemo(() => {
@@ -273,11 +469,181 @@ export function TripWorkspace({ initialTrip }: { initialTrip: Trip }) {
     return Math.round((packed / total) * 100);
   }, [trip.items]);
 
+  const tripOpenStats = useMemo(
+    () => openStats(trip.items, trip),
+    [trip]
+  );
+
   const copyEinladung = async () => {
     const url = `${window.location.origin}/join?code=${trip.inviteCode}`;
     await navigator.clipboard.writeText(url);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const renderItem = (item: PackItem) => {
+    const owner = resolveItemOwner(item, trip);
+    const color =
+      owner.kind === "shared"
+        ? SHARED_COLOR
+        : owner.kind === "user"
+          ? owner.user.color
+          : "#78716c";
+    const avatarUrl =
+      owner.kind === "user" ? owner.user.avatarUrl : null;
+    const priority = resolvePriority(item);
+    const pLabel = priorityLabel(priority);
+
+    return (
+      <li
+        key={item.id}
+        className="flex flex-col gap-2 rounded-xl border px-3 py-3 transition sm:flex-row sm:items-center"
+        style={tileStyle(color, Boolean(item.packedAt))}
+      >
+        <div className="flex min-w-0 flex-1 items-start gap-2 sm:items-center">
+          {avatarUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={avatarUrl}
+              alt=""
+              className="mt-0.5 h-6 w-6 shrink-0 rounded-full object-cover ring-1 ring-black/5 sm:mt-0"
+            />
+          ) : null}
+          <button
+            type="button"
+            onClick={() => togglePacked(item)}
+            className={cn(
+              "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border",
+              item.packedAt
+                ? "border-teal-700 bg-teal-700 text-white"
+                : "border-stone-300/80 bg-white/70 text-transparent"
+            )}
+            aria-label="Als gepackt markieren"
+          >
+            <Check className="h-4 w-4" />
+          </button>
+          <div className="min-w-0 flex-1">
+            <div className="font-medium text-stone-900">
+              {item.quantity}× {item.name}
+              {pLabel && (
+                <span
+                  className={cn(
+                    "ml-2 rounded-full px-2 py-0.5 text-[10px] font-semibold tracking-wide",
+                    priority === "EARLY"
+                      ? "bg-sky-100/90 text-sky-900"
+                      : "bg-stone-200/80 text-stone-700"
+                  )}
+                >
+                  {pLabel}
+                </span>
+              )}
+              {item.isShared && (
+                <span className="ml-2 rounded-full bg-amber-100/90 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-900">
+                  Gemeinsam
+                </span>
+              )}
+            </div>
+            <div className="text-xs text-stone-500">
+              {item.notes}
+              {item.packedAt && item.packedBy && (
+                <span className="ml-1 font-medium text-teal-800">
+                  · Gepackt von {item.packedBy.name}
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+        <div className="flex items-center gap-1.5 sm:ml-auto">
+          <select
+            className="rounded-lg border border-stone-200/80 bg-white/80 px-2 py-1.5 text-xs"
+            value={item.suitcaseId || ""}
+            onChange={(e) => moveSuitcase(item.id, e.target.value)}
+          >
+            {trip.suitcases.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name} (
+                {SUITCASE_SIZES.find((x) => x.id === s.size)?.label || s.size})
+              </option>
+            ))}
+          </select>
+          <button
+            type="button"
+            onClick={() => removeItem(item.id)}
+            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-stone-400 transition hover:bg-rose-50 hover:text-rose-600"
+            aria-label={`${item.name} entfernen`}
+            title="Nicht nötig — entfernen"
+          >
+            <Trash2 className="h-4 w-4" />
+          </button>
+        </div>
+      </li>
+    );
+  };
+
+  const renderSection = (
+    key: string,
+    title: string,
+    items: PackItem[],
+    opts?: { icon?: "clock" | "briefcase"; hint?: string }
+  ) => {
+    const open = isSectionOpen(key);
+    const stats = openStats(items, trip);
+    const Icon = opts?.icon === "clock" ? Clock : Briefcase;
+    const iconClass =
+      opts?.icon === "clock" ? "text-sky-800" : "text-teal-800";
+
+    return (
+      <div key={key} className="rounded-xl border border-stone-200/80 bg-white/40">
+        <button
+          type="button"
+          onClick={() => toggleSection(key)}
+          className="flex w-full items-start gap-2 px-3 py-2.5 text-left transition hover:bg-stone-50/80"
+          aria-expanded={open}
+        >
+          {open ? (
+            <ChevronDown className="mt-1 h-4 w-4 shrink-0 text-stone-500" />
+          ) : (
+            <ChevronRight className="mt-1 h-4 w-4 shrink-0 text-stone-500" />
+          )}
+          <Icon className={cn("mt-1 h-4 w-4 shrink-0", iconClass)} />
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+              <span className="font-display text-lg text-stone-900">{title}</span>
+              <span className="text-sm text-stone-500">
+                {stats.total} {stats.total === 1 ? "Item" : "Items"}
+              </span>
+            </div>
+            <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-stone-600">
+              {stats.openTotal === 0 ? (
+                <span className="font-medium text-teal-800">Alles erledigt</span>
+              ) : (
+                stats.buckets.map((b) => (
+                  <span
+                    key={b.key}
+                    className="inline-flex items-center gap-1"
+                  >
+                    <span
+                      className="h-1.5 w-1.5 rounded-full"
+                      style={{ background: b.color }}
+                    />
+                    {b.label}{" "}
+                    <strong className="text-stone-800">{b.open}</strong> offen
+                  </span>
+                ))
+              )}
+            </div>
+          </div>
+        </button>
+        {open && (
+          <div className="border-t border-stone-100 px-3 pb-3 pt-2">
+            {opts?.hint && (
+              <p className="mb-2 text-xs text-stone-500">{opts.hint}</p>
+            )}
+            <ul className="space-y-2">{items.map(renderItem)}</ul>
+          </div>
+        )}
+      </div>
+    );
   };
 
   return (
@@ -326,7 +692,34 @@ export function TripWorkspace({ initialTrip }: { initialTrip: Trip }) {
             style={{ width: `${progress}%` }}
           />
         </div>
-        <p className="text-sm text-stone-600">{progress}% gepackt</p>
+        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-sm text-stone-600">
+          <span>
+            <strong className="text-stone-900">{tripOpenStats.total}</strong> Items ·{" "}
+            {progress}% gepackt
+          </span>
+          {tripOpenStats.openTotal > 0 ? (
+            <span className="flex flex-wrap items-center gap-2">
+              {tripOpenStats.buckets.map((b) => (
+                <span
+                  key={b.key}
+                  className="inline-flex items-center gap-1.5"
+                  title={`${b.label}: ${b.open} offen`}
+                >
+                  <span
+                    className="h-2 w-2 rounded-full"
+                    style={{ background: b.color }}
+                  />
+                  <span>
+                    {b.label}{" "}
+                    <strong className="text-stone-800">{b.open}</strong> offen
+                  </span>
+                </span>
+              ))}
+            </span>
+          ) : (
+            <span className="font-medium text-teal-800">Alles erledigt</span>
+          )}
+        </div>
 
         <div className="grid gap-4 rounded-2xl border border-stone-200 bg-white/70 p-4 md:grid-cols-3">
           <div className="space-y-3">
@@ -343,6 +736,42 @@ export function TripWorkspace({ initialTrip }: { initialTrip: Trip }) {
               </div>
             </div>
             <GenderPicker value={genderDraft} onChange={setGenderDraft} />
+            <div>
+              <Label>Avatar (freiwillig)</Label>
+              <input
+                type="file"
+                accept="image/*"
+                className="block w-full text-xs text-stone-600 file:mr-3 file:rounded-lg file:border-0 file:bg-teal-800 file:px-3 file:py-2 file:text-xs file:font-semibold file:text-white"
+                onChange={async (e) => {
+                  const file = e.target.files?.[0];
+                  if (!file || !user) return;
+                  const body = new FormData();
+                  body.append("file", file);
+                  body.append("userId", user.id);
+                  body.append("userName", nameDraft || user.name);
+                  body.append("userColor", user.color);
+                  const res = await fetch("/api/avatars", {
+                    method: "POST",
+                    body,
+                  });
+                  if (!res.ok) return;
+                  const data = await res.json();
+                  const next = { ...user, avatarUrl: data.avatarUrl };
+                  setLocalUser(next);
+                  setUser(next);
+                  await fetch(`/api/trips/${trip.id}/members`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      user: next,
+                      inviteCode: trip.inviteCode,
+                    }),
+                  });
+                  const tripRes = await fetch(`/api/trips/${trip.id}`);
+                  if (tripRes.ok) setTrip(await tripRes.json());
+                }}
+              />
+            </div>
           </div>
           <div>
             <Label className="flex items-center gap-1">
@@ -352,12 +781,21 @@ export function TripWorkspace({ initialTrip }: { initialTrip: Trip }) {
               {trip.members.map((m) => (
                 <span
                   key={m.user.id}
-                  className="inline-flex items-center gap-2 rounded-full border border-stone-200 bg-stone-50 px-3 py-1 text-xs"
+                  className="inline-flex items-center gap-2 rounded-full border border-stone-200 bg-stone-50 px-2 py-1 text-xs"
                 >
-                  <span
-                    className="h-2.5 w-2.5 rounded-full"
-                    style={{ background: m.user.color }}
-                  />
+                  {m.user.avatarUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={m.user.avatarUrl}
+                      alt=""
+                      className="h-5 w-5 rounded-full object-cover"
+                    />
+                  ) : (
+                    <span
+                      className="h-2.5 w-2.5 rounded-full"
+                      style={{ background: m.user.color }}
+                    />
+                  )}
                   {m.user.name}
                   <span className="text-stone-400">
                     {m.role === "OWNER"
@@ -368,6 +806,13 @@ export function TripWorkspace({ initialTrip }: { initialTrip: Trip }) {
                   </span>
                 </span>
               ))}
+              <span className="inline-flex items-center gap-2 rounded-full border border-amber-200 bg-amber-50 px-2 py-1 text-xs text-amber-900">
+                <span
+                  className="h-2.5 w-2.5 rounded-full"
+                  style={{ background: SHARED_COLOR }}
+                />
+                Gemeinsam
+              </span>
             </div>
           </div>
           <div>
@@ -503,71 +948,20 @@ export function TripWorkspace({ initialTrip }: { initialTrip: Trip }) {
           </div>
         </div>
 
-        <div className="space-y-6">
-          {byCategory.map(([category, items]) => (
-            <div key={category}>
-              <h3 className="mb-2 flex items-center gap-2 font-display text-lg text-stone-900">
-                <Briefcase className="h-4 w-4 text-teal-800" />
-                {category}
-              </h3>
-              <ul className="space-y-2">
-                {items.map((item) => (
-                  <li
-                    key={item.id}
-                    className={cn(
-                      "flex flex-col gap-2 rounded-xl border px-3 py-3 transition sm:flex-row sm:items-center",
-                      item.packedAt
-                        ? "border-teal-200 bg-teal-50/60"
-                        : "border-stone-200 bg-white/80"
-                    )}
-                  >
-                    <button
-                      type="button"
-                      onClick={() => togglePacked(item)}
-                      className={cn(
-                        "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border",
-                        item.packedAt
-                          ? "border-teal-700 bg-teal-700 text-white"
-                          : "border-stone-300 bg-white text-transparent"
-                      )}
-                      aria-label="Als gepackt markieren"
-                    >
-                      <Check className="h-4 w-4" />
-                    </button>
-                    <div className="min-w-0 flex-1">
-                      <div className="font-medium text-stone-900">
-                        {item.quantity}× {item.name}
-                        {item.isShared && (
-                          <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-900">
-                            Gemeinsam
-                          </span>
-                        )}
-                      </div>
-                      <div className="text-xs text-stone-500">
-                        {item.notes}
-                        {item.packedAt && item.packedBy && (
-                          <span className="ml-1 font-medium text-teal-800">
-                            · Gepackt von {item.packedBy.name}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    <select
-                      className="rounded-lg border border-stone-200 bg-white px-2 py-1.5 text-xs"
-                      value={item.suitcaseId || ""}
-                      onChange={(e) => moveSuitcase(item.id, e.target.value)}
-                    >
-                      {trip.suitcases.map((s) => (
-                        <option key={s.id} value={s.id}>
-                          {s.name} ({SUITCASE_SIZES.find((x) => x.id === s.size)?.label || s.size})
-                        </option>
-                      ))}
-                    </select>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
+        <div className="space-y-3">
+          {earlyItems.length > 0 &&
+            renderSection(
+              EARLY_SECTION_KEY,
+              "Rechtzeitig vorbereiten",
+              earlyItems,
+              {
+                icon: "clock",
+                hint: "Formulare, Visa und Co. — besser Tage oder Wochen vorher erledigen.",
+              }
+            )}
+          {byCategory.map(([category, items]) =>
+            renderSection(category, category, items, { icon: "briefcase" })
+          )}
         </div>
       </section>
     </div>

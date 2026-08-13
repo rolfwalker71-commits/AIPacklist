@@ -9,6 +9,7 @@ export type UserInput = {
   name: string;
   color?: string;
   gender?: PackGender;
+  avatarUrl?: string | null;
 };
 
 export async function ensureUser(input: UserInput) {
@@ -22,6 +23,9 @@ export async function ensureUser(input: UserInput) {
           name: input.name,
           color: input.color ?? existing.color,
           gender: input.gender ?? existing.gender,
+          ...(input.avatarUrl !== undefined
+            ? { avatarUrl: input.avatarUrl }
+            : {}),
         },
       });
     }
@@ -33,6 +37,7 @@ export async function ensureUser(input: UserInput) {
       name: input.name,
       color: input.color ?? USER_COLORS[0],
       gender,
+      avatarUrl: input.avatarUrl || null,
     },
   });
 }
@@ -163,6 +168,7 @@ export async function createTripFromDraft(
           category: item.category,
           quantity: item.quantity,
           isShared: item.isShared,
+          priority: item.priority || "NORMAL",
           notes: item.notes,
           source: item.source,
         })),

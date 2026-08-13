@@ -11,98 +11,113 @@ export async function POST(
   { params }: { params: Promise<{ tripId: string }> }
 ) {
   const { tripId } = await params;
-  if (!isAiConfigured()) {
+  try {
+    if (!isAiConfigured()) {
+      return NextResponse.json(
+        {
+          error:
+            "OpenAI ist nicht konfiguriert. Unter /settings den Schlüssel hinterlegen.",
+        },
+        { status: 400 }
+      );
+    }
+
+    const trip = await prisma.trip.findUnique({
+      where: { id: tripId },
+      include: tripInclude,
+    });
+    if (!trip) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
+
+    const travelers: TravelerProfile[] = trip.members.map((m) => ({
+      key: m.userId,
+      name: m.user.name,
+      gender: (m.user.gender as PackGender) || "UNSPECIFIED",
+    }));
+
+    const legs = trip.legs.map((leg) => ({
+      name: leg.name,
+      startDate: leg.startDate.toISOString().slice(0, 10),
+      endDate: leg.endDate.toISOString().slice(0, 10),
+      transport: leg.transport,
+      laundryAvailable: leg.laundryAvailable,
+      laundryIntervalDays: leg.laundryIntervalDays,
+      weatherTags: JSON.parse(leg.weatherTags) as never[],
+      dressCodes: JSON.parse(leg.dressCodes) as never[],
+    }));
+
+    const existing = trip.items.map((i) => ({
+      name: i.name,
+      category: i.category,
+      quantity: i.quantity,
+      isShared: i.isShared,
+      priority: i.priority as "EARLY" | "NORMAL" | "DAY_OF",
+      notes: i.notes || undefined,
+      source: (i.source as "calculator") || "calculator",
+    }));
+
+    const enriched = await enrichPackListWithAi({
+      legs,
+      travelers,
+      existing,
+    });
+
+    if (!enriched.items.length) {
+      return NextResponse.json({
+        ...serializeTrip(trip),
+        tips: enriched.tips,
+        added: 0,
+      });
+    }
+
+    const sharedBag = trip.suitcases.find((s) => s.isShared);
+    const personalBags = trip.suitcases.filter((s) => !s.isShared);
+
+    for (const item of enriched.items) {
+      const owner =
+        !item.isShared && item.assigneeKey
+          ? travelers.find((t) => t.key === item.assigneeKey)
+          : undefined;
+      const suitcaseId = item.isShared
+        ? sharedBag?.id
+        : personalBags.find((b) => b.ownerUserId === owner?.key)?.id ||
+          personalBags[0]?.id ||
+          sharedBag?.id;
+
+      await prisma.packItem.create({
+        data: {
+          tripId,
+          name: item.name,
+          category: item.category,
+          quantity: item.quantity,
+          isShared: item.isShared,
+          priority: item.priority || "NORMAL",
+          notes: item.notes,
+          source: "ai",
+          suitcaseId: suitcaseId || null,
+        },
+      });
+    }
+
+    const full = await prisma.trip.findUniqueOrThrow({
+      where: { id: tripId },
+      include: tripInclude,
+    });
+    publish({ type: "trip_updated", tripId });
+
+    return NextResponse.json({
+      ...serializeTrip(full),
+      tips: enriched.tips,
+      added: enriched.items.length,
+    });
+  } catch (e) {
+    console.error("ai-enrich failed", e);
+    const message =
+      e instanceof Error ? e.message : "Unbekannter KI-/Datenbankfehler";
     return NextResponse.json(
-      { error: "OpenAI ist nicht konfiguriert. Unter /settings den Schlüssel hinterlegen." },
-      { status: 400 }
+      { error: message.slice(0, 280) },
+      { status: 500 }
     );
   }
-
-  const trip = await prisma.trip.findUnique({
-    where: { id: tripId },
-    include: tripInclude,
-  });
-  if (!trip) {
-    return NextResponse.json({ error: "Not found" }, { status: 404 });
-  }
-
-  const travelers: TravelerProfile[] = trip.members.map((m) => ({
-    key: m.userId,
-    name: m.user.name,
-    gender: (m.user.gender as PackGender) || "UNSPECIFIED",
-  }));
-
-  const legs = trip.legs.map((leg) => ({
-    name: leg.name,
-    startDate: leg.startDate.toISOString().slice(0, 10),
-    endDate: leg.endDate.toISOString().slice(0, 10),
-    transport: leg.transport,
-    laundryAvailable: leg.laundryAvailable,
-    laundryIntervalDays: leg.laundryIntervalDays,
-    weatherTags: JSON.parse(leg.weatherTags) as never[],
-    dressCodes: JSON.parse(leg.dressCodes) as never[],
-  }));
-
-  const existing = trip.items.map((i) => ({
-    name: i.name,
-    category: i.category,
-    quantity: i.quantity,
-    isShared: i.isShared,
-    notes: i.notes || undefined,
-    source: (i.source as "calculator") || "calculator",
-  }));
-
-  const enriched = await enrichPackListWithAi({
-    legs,
-    travelers,
-    existing,
-  });
-
-  if (!enriched.items.length) {
-    return NextResponse.json({
-      ...serializeTrip(trip),
-      tips: enriched.tips,
-      added: 0,
-    });
-  }
-
-  const sharedBag = trip.suitcases.find((s) => s.isShared);
-  const personalBags = trip.suitcases.filter((s) => !s.isShared);
-
-  for (const item of enriched.items) {
-    const owner =
-      !item.isShared && item.assigneeKey
-        ? travelers.find((t) => t.key === item.assigneeKey)
-        : undefined;
-    const suitcaseId = item.isShared
-      ? sharedBag?.id
-      : personalBags.find((b) => b.ownerUserId === owner?.key)?.id ||
-        personalBags[0]?.id ||
-        sharedBag?.id;
-
-    await prisma.packItem.create({
-      data: {
-        tripId,
-        name: item.name,
-        category: item.category,
-        quantity: item.quantity,
-        isShared: item.isShared,
-        notes: item.notes,
-        source: "ai",
-        suitcaseId: suitcaseId || null,
-      },
-    });
-  }
-
-  const full = await prisma.trip.findUniqueOrThrow({
-    where: { id: tripId },
-    include: tripInclude,
-  });
-  publish({ type: "trip_updated", tripId });
-
-  return NextResponse.json({
-    ...serializeTrip(full),
-    tips: enriched.tips,
-    added: enriched.items.length,
-  });
 }

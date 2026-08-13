@@ -1,5 +1,11 @@
 import { aiJsonCompletion, isAiConfigured } from "./openai";
 import { calculatePackList, summarizeLaundry } from "./calculator";
+import {
+  inferPriority,
+  mergePriority,
+  parseAiPriority,
+  type PackPriority,
+} from "./priority";
 import type { CalculatedItem, LegInput, TravelerProfile } from "./types";
 
 type AiPackResponse = {
@@ -10,6 +16,7 @@ type AiPackResponse = {
     isShared: boolean;
     notes?: string;
     forTraveler?: string | null;
+    priority?: string;
   }[];
   tips?: string[];
 };
@@ -41,6 +48,17 @@ function forcePersonalIfNeeded(name: string, isShared: boolean): boolean {
   return isShared;
 }
 
+function itemPriority(
+  name: string,
+  category: string,
+  notes: string | undefined,
+  aiPriority: unknown
+): PackPriority {
+  const fromAi = parseAiPriority(aiPriority);
+  const inferred = inferPriority(name, category, notes);
+  return fromAi ? mergePriority(fromAi, inferred) : inferred;
+}
+
 function mapAiItems(
   raw: AiPackResponse["items"],
   travelers: TravelerProfile[]
@@ -53,20 +71,25 @@ function mapAiItems(
       (t) => t.name.toLowerCase() === String(i.forTraveler || "").toLowerCase()
     );
     let isShared = forcePersonalIfNeeded(i.name, Boolean(i.isShared));
+    const name = String(i.name).slice(0, 80);
+    const category = String(i.category || "Sonstiges").slice(0, 40);
+    const quantity = Math.max(1, Number(i.quantity) || 1);
 
     // Personal item without traveler → expand to every traveler
     if (!isShared && !traveler && travelers.length > 0) {
       for (const t of travelers) {
+        const notes = i.notes
+          ? `für ${t.name} · ${i.notes}`
+          : `für ${t.name} · KI`;
         items.push({
-          name: String(i.name).slice(0, 80),
-          category: String(i.category || "Sonstiges").slice(0, 40),
-          quantity: Math.max(1, Number(i.quantity) || 1),
+          name,
+          category,
+          quantity,
           isShared: false,
-          notes: i.notes
-            ? `für ${t.name} · ${i.notes}`
-            : `für ${t.name} · KI`,
+          notes,
           source: "ai",
           assigneeKey: t.key,
+          priority: itemPriority(name, category, notes, i.priority),
         });
       }
       continue;
@@ -74,22 +97,25 @@ function mapAiItems(
 
     if (isShared && traveler) isShared = false;
 
+    const notes = i.notes
+      ? String(i.notes)
+      : isShared
+        ? "gemeinsam · KI"
+        : traveler
+          ? `für ${traveler.name} · KI`
+          : "KI";
+
     items.push({
-      name: String(i.name).slice(0, 80),
-      category: String(i.category || "Sonstiges").slice(0, 40),
-      quantity: Math.max(1, Number(i.quantity) || 1),
+      name,
+      category,
+      quantity,
       isShared,
-      notes: i.notes
-        ? String(i.notes)
-        : isShared
-          ? "gemeinsam · KI"
-          : traveler
-            ? `für ${traveler.name} · KI`
-            : "KI",
+      notes,
       source: "ai",
       assigneeKey: isShared
         ? "shared"
         : traveler?.key || travelers[0]?.key || "traveler-1",
+      priority: itemPriority(name, category, notes, i.priority),
     });
   }
 
@@ -142,7 +168,11 @@ Prinzipien (wichtiger als starre Listen):
 3) NIEMALS Reisepass/Tickets/ESTA/Zahnbürste als gemeinsam markieren.
 4) Mengen an Waschtagen und Etappen anpassen (siehe laundryStats).
 5) Pro Person eigene Kleidungsmengen; bei Paaren nicht alles doppelt als "gemeinsam" ablegen.
-6) Sprache: Schweizer Hochdeutsch (ss statt ß).
+6) Priorität (priority):
+   - EARLY: muss Tage/Wochen vorher erledigt werden (ESTA/Visa/Impfung/Versicherung/Formulare/Pass beantragen).
+   - DAY_OF: erst am Reisetag / kurz vorher (Bordkarte ausdrucken, Schlüssel, Geldbörse).
+   - NORMAL: normales Packen.
+7) Sprache: Schweizer Hochdeutsch (ss statt ß).
 
 JSON:
 {
@@ -152,7 +182,8 @@ JSON:
     "quantity": number,
     "isShared": boolean,
     "notes": string,
-    "forTraveler": string|null
+    "forTraveler": string|null,
+    "priority": "EARLY"|"NORMAL"|"DAY_OF"
   }],
   "tips": string[]
 }
@@ -212,6 +243,7 @@ export async function enrichPackListWithAi(args: {
       system: `Du ergänzt eine bestehende FlexiPack-Packliste. Nur fehlende, sinnvolle Einträge.
 Persönlich: Pass, Tickets, ESTA, Zahnbürste, Powerbank, Ladekabel, Medikamente — nie gemeinsam.
 Gemeinsam: nur Zahnpasta, Sonnencreme, Schirm, Erste Hilfe, Organizer, Duschgel.
+priority: EARLY (Formulare/Visa/Impfung), NORMAL, DAY_OF (Bordkarte/Schlüssel).
 Schweizer Hochdeutsch. JSON wie {"items":[...], "tips":[...]}. Max 12 Items, max 5 Tipps.`,
       user: JSON.stringify({
         legs: args.legs,
@@ -224,6 +256,7 @@ Schweizer Hochdeutsch. JSON wie {"items":[...], "tips":[...]}. Max 12 Items, max
           category: i.category,
           isShared: i.isShared,
           notes: i.notes,
+          priority: i.priority,
         })),
       }),
       temperature: 0.4,

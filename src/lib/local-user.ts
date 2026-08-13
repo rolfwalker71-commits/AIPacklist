@@ -9,6 +9,7 @@ export interface LocalUser {
   name: string;
   color: string;
   gender: PackGender;
+  avatarUrl?: string | null;
 }
 
 export function getLocalUser(): LocalUser | null {
@@ -20,6 +21,7 @@ export function getLocalUser(): LocalUser | null {
     return {
       ...parsed,
       gender: parsed.gender || "UNSPECIFIED",
+      avatarUrl: parsed.avatarUrl || null,
     };
   } catch {
     return null;
@@ -38,6 +40,7 @@ export function ensureLocalUser(): LocalUser {
     name: "Reisende:r",
     color: "#0F766E",
     gender: "UNSPECIFIED",
+    avatarUrl: null,
   };
   setLocalUser(user);
   return user;

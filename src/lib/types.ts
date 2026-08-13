@@ -35,6 +35,7 @@ export interface CalculatedItem {
   category: string;
   quantity: number;
   isShared: boolean;
+  priority?: "EARLY" | "NORMAL" | "DAY_OF";
   notes?: string;
   source: "calculator" | "template" | "manual" | "ai";
   /** Traveler key for personal items; undefined/shared for shared */

@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { GenderPicker } from "@/components/ui/gender-picker";
 import { ensureLocalUser, setLocalUser } from "@/lib/local-user";
 import type { PackGender } from "@/lib/types";
+import { USER_COLORS } from "@/lib/utils";
 
 function JoinForm() {
   const router = useRouter();
@@ -31,7 +32,7 @@ function JoinForm() {
       const user = {
         ...local,
         name: name || local.name,
-        color: "#B45309",
+        color: local.color === USER_COLORS[0] ? USER_COLORS[1] : local.color,
         gender,
       };
       setLocalUser(user);

@@ -30,6 +30,7 @@ model User {
   id        String   @id @default(cuid())
   name      String
   color     String   @default("#0F766E")
+  avatarUrl String?
   gender    Gender   @default(UNSPECIFIED)
   createdAt DateTime @default(now())
 
@@ -107,13 +108,14 @@ enum SuitcaseSize {
 }
 
 model PackItem {
-  id             String    @id @default(cuid())
+  id             String       @id @default(cuid())
   name           String
   category       String
-  quantity       Int       @default(1)
-  isShared       Boolean   @default(false)
+  quantity       Int          @default(1)
+  isShared       Boolean      @default(false)
+  priority       PackPriority @default(NORMAL)
   notes          String?
-  source         String    @default("calculator")
+  source         String       @default("calculator")
   packedAt       DateTime?
   packedByUserId String?
   suitcaseId     String?
@@ -125,4 +127,10 @@ model PackItem {
   suitcase Suitcase? @relation(fields: [suitcaseId], references: [id])
 
   @@index([tripId])
+}
+
+enum PackPriority {
+  EARLY
+  NORMAL
+  DAY_OF
 }

@@ -6,6 +6,7 @@ import type {
   TravelerProfile,
   WeatherTag,
 } from "./types";
+import { inferPriority } from "./priority";
 
 function legDays(leg: LegInput): number {
   const start = parseISO(leg.startDate);
@@ -97,6 +98,7 @@ function personalItemsForTraveler(
     opts?: Partial<CalculatedItem>
   ) => {
     const extraNotes = opts?.notes;
+    const notes = extraNotes ? `${forName} · ${extraNotes}` : forName;
     items.push({
       name,
       category,
@@ -105,7 +107,8 @@ function personalItemsForTraveler(
       source: "calculator",
       assigneeKey: traveler.key,
       ...opts,
-      notes: extraNotes ? `${forName} · ${extraNotes}` : forName,
+      notes,
+      priority: opts?.priority || inferPriority(name, category, notes),
     });
   };
 
@@ -299,6 +302,8 @@ export function calculatePackList(
       source: "calculator",
       assigneeKey: "shared",
       ...opts,
+      priority:
+        opts?.priority || inferPriority(name, category, opts?.notes),
     });
   };
 

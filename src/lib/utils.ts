@@ -29,11 +29,12 @@ export function generateInviteCode(): string {
   return code;
 }
 
+/** Per-user accents — keep distinct from SHARED_COLOR in colors.ts */
 export const USER_COLORS = [
   "#0F766E",
-  "#B45309",
   "#1D4ED8",
   "#BE123C",
   "#7C3AED",
   "#047857",
+  "#C026D3",
 ];

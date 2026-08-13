@@ -105,7 +105,7 @@ export function CreateTripClient() {
           partner: partnerName
             ? {
                 name: partnerName,
-                color: "#B45309",
+                color: "#1D4ED8",
                 gender: partnerGender,
               }
             : undefined,

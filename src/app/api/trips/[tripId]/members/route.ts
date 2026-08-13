@@ -16,6 +16,7 @@ export async function POST(
       name: string;
       color?: string;
       gender?: "FEMALE" | "MALE" | "UNSPECIFIED";
+      avatarUrl?: string | null;
     };
   };
 
