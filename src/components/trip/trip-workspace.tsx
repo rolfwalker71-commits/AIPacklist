@@ -16,6 +16,7 @@ import { GenderPicker } from "@/components/ui/gender-picker";
 import { cn, formatDate } from "@/lib/utils";
 import { ensureLocalUser, setLocalUser, type LocalUser } from "@/lib/local-user";
 import type { PackGender } from "@/lib/types";
+import { SUITCASE_SIZES } from "@/lib/suitcases";
 
 type PackItem = {
   id: string;
@@ -51,6 +52,8 @@ type Trip = {
   suitcases: {
     id: string;
     name: string;
+    size: string;
+    isShared: boolean;
     ownerUserId: string | null;
     owner?: { name: string } | null;
   }[];
@@ -96,8 +99,7 @@ export function TripWorkspace({ initialTrip }: { initialTrip: Trip }) {
             return { ...prev, items };
           });
         }
-        if (event.type === "member_joined") {
-          // soft refresh members
+        if (event.type === "member_joined" || event.type === "trip_updated") {
           fetch(`/api/trips/${trip.id}`)
             .then((r) => r.json())
             .then(setTrip)
@@ -176,6 +178,42 @@ export function TripWorkspace({ initialTrip }: { initialTrip: Trip }) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ itemId, suitcaseId }),
     });
+  };
+
+  const updateSuitcaseSize = async (suitcaseId: string, size: string) => {
+    setTrip((prev) => ({
+      ...prev,
+      suitcases: prev.suitcases.map((s) =>
+        s.id === suitcaseId ? { ...s, size } : s
+      ),
+    }));
+    const res = await fetch(`/api/trips/${trip.id}/suitcases`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ suitcaseId, size }),
+    });
+    if (res.ok) setTrip(await res.json());
+  };
+
+  const addSuitcase = async () => {
+    const res = await fetch(`/api/trips/${trip.id}/suitcases`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: `Koffer ${trip.suitcases.length + 1}`,
+        size: "MEDIUM",
+        ownerUserId: user?.id,
+      }),
+    });
+    if (res.ok) setTrip(await res.json());
+  };
+
+  const removeSuitcase = async (suitcaseId: string) => {
+    const res = await fetch(
+      `/api/trips/${trip.id}/suitcases?suitcaseId=${suitcaseId}`,
+      { method: "DELETE" }
+    );
+    if (res.ok) setTrip(await res.json());
   };
 
   const filtered = useMemo(() => {
@@ -350,27 +388,60 @@ export function TripWorkspace({ initialTrip }: { initialTrip: Trip }) {
           </select>
         </div>
 
-        <div className="grid gap-3 md:grid-cols-3">
-          {trip.suitcases.map((s) => {
-            const count = trip.items.filter((i) => i.suitcaseId === s.id).length;
-            const packed = trip.items.filter(
-              (i) => i.suitcaseId === s.id && i.packedAt
-            ).length;
-            return (
-              <div
-                key={s.id}
-                className="flex items-center gap-3 rounded-xl border border-stone-200 bg-white/80 px-4 py-3"
-              >
-                <Luggage className="h-5 w-5 text-teal-800" />
-                <div>
-                  <div className="text-sm font-semibold">{s.name}</div>
-                  <div className="text-xs text-stone-500">
-                    {packed}/{count} Items
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="font-display text-lg text-stone-900">Koffer</h3>
+            <Button type="button" variant="secondary" size="sm" onClick={addSuitcase}>
+              Koffer hinzufügen
+            </Button>
+          </div>
+          <div className="grid gap-3 md:grid-cols-3">
+            {trip.suitcases.map((s) => {
+              const count = trip.items.filter((i) => i.suitcaseId === s.id).length;
+              const packed = trip.items.filter(
+                (i) => i.suitcaseId === s.id && i.packedAt
+              ).length;
+              return (
+                <div
+                  key={s.id}
+                  className="rounded-xl border border-stone-200 bg-white/80 px-4 py-3"
+                >
+                  <div className="flex items-start gap-3">
+                    <Luggage className="mt-0.5 h-5 w-5 text-teal-800" />
+                    <div className="min-w-0 flex-1">
+                      <div className="text-sm font-semibold">{s.name}</div>
+                      <div className="text-xs text-stone-500">
+                        {packed}/{count} Items
+                        {s.isShared ? " · Shared" : ""}
+                      </div>
+                      <select
+                        className="mt-2 w-full rounded-lg border border-stone-200 bg-white px-2 py-1.5 text-xs"
+                        value={s.size}
+                        onChange={(e) =>
+                          updateSuitcaseSize(s.id, e.target.value)
+                        }
+                      >
+                        {SUITCASE_SIZES.map((opt) => (
+                          <option key={opt.id} value={opt.id}>
+                            {opt.label} — {opt.hint}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    {trip.suitcases.length > 1 && (
+                      <button
+                        type="button"
+                        className="text-xs text-rose-600"
+                        onClick={() => removeSuitcase(s.id)}
+                      >
+                        Entfernen
+                      </button>
+                    )}
                   </div>
                 </div>
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
         </div>
 
         <div className="space-y-6">
@@ -429,7 +500,7 @@ export function TripWorkspace({ initialTrip }: { initialTrip: Trip }) {
                     >
                       {trip.suitcases.map((s) => (
                         <option key={s.id} value={s.id}>
-                          {s.name}
+                          {s.name} ({SUITCASE_SIZES.find((x) => x.id === s.size)?.label || s.size})
                         </option>
                       ))}
                     </select>

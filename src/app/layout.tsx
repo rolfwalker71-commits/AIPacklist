@@ -5,6 +5,7 @@ import "./globals.css";
 const outfit = Outfit({
   subsets: ["latin"],
   variable: "--font-outfit",
+  display: "swap",
 });
 
 export const metadata: Metadata = {
@@ -33,8 +34,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="de">
-      <body className={`${outfit.variable} antialiased`}>
+    <html lang="de" className={`${outfit.variable} ${outfit.className}`}>
+      <body className="font-sans antialiased">
         <div className="app-shell min-h-screen">
           <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
             <div className="absolute -left-24 top-0 h-72 w-72 rounded-full bg-teal-300/30 blur-3xl" />

@@ -1,11 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { LayoutTemplate, Sparkles, Waypoints } from "lucide-react";
 import { MultiLegWizard } from "@/components/wizard/multi-leg-wizard";
 import { VibeInput } from "@/components/wizard/vibe-input";
 import { TemplatePicker } from "@/components/wizard/template-picker";
+import {
+  SuitcasePlanner,
+  defaultSuitcasePlans,
+} from "@/components/wizard/suitcase-planner";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -13,6 +17,7 @@ import { GenderPicker } from "@/components/ui/gender-picker";
 import { cn } from "@/lib/utils";
 import { ensureLocalUser, setLocalUser } from "@/lib/local-user";
 import type { PackGender, TripDraft } from "@/lib/types";
+import type { SuitcasePlan } from "@/lib/suitcases";
 import { TEMPLATES } from "@/lib/templates";
 
 type Mode = "wizard" | "vibe" | "templates";
@@ -32,8 +37,52 @@ export function CreateTripClient() {
   const [partnerName, setPartnerName] = useState("Anna");
   const [ownerGender, setOwnerGender] = useState<PackGender>("MALE");
   const [partnerGender, setPartnerGender] = useState<PackGender>("FEMALE");
+  const [suitcasePlans, setSuitcasePlans] = useState<SuitcasePlan[]>(() =>
+    defaultSuitcasePlans("Ben", "Anna")
+  );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setSuitcasePlans((prev) => {
+      // Keep sizes/count, refresh default names for owner/partner roles lightly
+      return prev.map((p) => {
+        if (p.ownerRole === "owner" && /^Koffer 1/.test(p.name)) {
+          return { ...p, name: `Koffer 1 (${ownerName || "Du"})` };
+        }
+        if (p.ownerRole === "partner" && partnerName.trim() && /^Koffer 2/.test(p.name)) {
+          return { ...p, name: `Koffer 2 (${partnerName})` };
+        }
+        return p;
+      });
+    });
+  }, [ownerName, partnerName]);
+
+  useEffect(() => {
+    if (!partnerName.trim()) {
+      setSuitcasePlans((prev) =>
+        prev
+          .filter((p) => p.ownerRole !== "partner")
+          .map((p) =>
+            p.ownerRole === "partner" ? { ...p, ownerRole: "owner" as const } : p
+          )
+      );
+    } else {
+      setSuitcasePlans((prev) => {
+        if (prev.some((p) => p.ownerRole === "partner")) return prev;
+        return [
+          ...prev.filter((p) => p.ownerRole !== "shared"),
+          {
+            id: crypto.randomUUID(),
+            name: `Koffer 2 (${partnerName})`,
+            size: "MEDIUM" as const,
+            ownerRole: "partner" as const,
+          },
+          ...prev.filter((p) => p.ownerRole === "shared"),
+        ];
+      });
+    }
+  }, [partnerName]);
 
   const create = async (finalDraft: TripDraft) => {
     setBusy(true);
@@ -60,6 +109,7 @@ export function CreateTripClient() {
                 gender: partnerGender,
               }
             : undefined,
+          suitcasePlans,
         }),
       });
       if (!res.ok) throw new Error("Trip konnte nicht erstellt werden");
@@ -127,6 +177,13 @@ export function CreateTripClient() {
           )}
         </div>
       </div>
+
+      <SuitcasePlanner
+        plans={suitcasePlans}
+        onChange={setSuitcasePlans}
+        ownerName={ownerName}
+        partnerName={partnerName}
+      />
 
       {mode === "wizard" && (
         <MultiLegWizard

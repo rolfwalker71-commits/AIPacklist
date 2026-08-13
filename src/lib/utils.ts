@@ -12,9 +12,10 @@ export function daysBetween(start: Date, end: Date): number {
 
 export function formatDate(d: Date | string): string {
   const date = typeof d === "string" ? new Date(d) : d;
+  if (Number.isNaN(date.getTime())) return "";
   return date.toLocaleDateString("de-DE", {
     day: "2-digit",
-    month: "short",
+    month: "2-digit",
     year: "numeric",
   });
 }

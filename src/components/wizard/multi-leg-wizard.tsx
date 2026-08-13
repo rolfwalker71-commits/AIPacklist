@@ -6,6 +6,7 @@ import { addDays, differenceInCalendarDays, formatISO, parseISO } from "date-fns
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { DatePicker } from "@/components/ui/date-picker";
 import type { DressCode, LegInput, Transport, TravelerProfile, TripDraft, WeatherTag } from "@/lib/types";
 import { calculatePackList, summarizeLaundry } from "@/lib/calculator";
 import { cn } from "@/lib/utils";
@@ -127,19 +128,11 @@ export function MultiLegWizard({ onSubmit, initial, busy, travelers }: Props) {
         </div>
         <div>
           <Label>Reisebeginn</Label>
-          <Input
-            type="date"
-            value={rangeStart}
-            onChange={(e) => setRangeStart(e.target.value)}
-          />
+          <DatePicker value={rangeStart} onChange={setRangeStart} max={rangeEnd} />
         </div>
         <div>
           <Label>Reiseende</Label>
-          <Input
-            type="date"
-            value={rangeEnd}
-            onChange={(e) => setRangeEnd(e.target.value)}
-          />
+          <DatePicker value={rangeEnd} onChange={setRangeEnd} min={rangeStart} />
         </div>
       </div>
 
@@ -212,18 +205,18 @@ export function MultiLegWizard({ onSubmit, initial, busy, travelers }: Props) {
             <div className="grid gap-3 md:grid-cols-2">
               <div>
                 <Label>Start</Label>
-                <Input
-                  type="date"
+                <DatePicker
                   value={leg.startDate}
-                  onChange={(e) => updateLeg(idx, { startDate: e.target.value })}
+                  onChange={(v) => updateLeg(idx, { startDate: v })}
+                  max={leg.endDate}
                 />
               </div>
               <div>
                 <Label>Ende</Label>
-                <Input
-                  type="date"
+                <DatePicker
                   value={leg.endDate}
-                  onChange={(e) => updateLeg(idx, { endDate: e.target.value })}
+                  onChange={(v) => updateLeg(idx, { endDate: v })}
+                  min={leg.startDate}
                 />
               </div>
             </div>

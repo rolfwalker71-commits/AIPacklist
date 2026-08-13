@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createTripFromDraft, serializeTrip } from "@/lib/trip-service";
 import { prisma } from "@/lib/db";
 import type { TripDraft } from "@/lib/types";
+import type { SuitcasePlan } from "@/lib/suitcases";
 
 export async function GET() {
   const trips = await prisma.trip.findMany({
@@ -39,11 +40,12 @@ export async function POST(req: NextRequest) {
         gender?: "FEMALE" | "MALE" | "UNSPECIFIED";
       }
     | undefined;
+  const suitcasePlans = body.suitcasePlans as SuitcasePlan[] | undefined;
 
   if (!draft?.legs?.length || !owner?.name) {
     return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
   }
 
-  const trip = await createTripFromDraft(draft, owner, partner);
+  const trip = await createTripFromDraft(draft, owner, partner, suitcasePlans);
   return NextResponse.json(serializeTrip(trip));
 }

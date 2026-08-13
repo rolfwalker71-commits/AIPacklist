@@ -2,6 +2,7 @@ import { prisma } from "./db";
 import { calculatePackList } from "./calculator";
 import { generateInviteCode, USER_COLORS } from "./utils";
 import type { PackGender, TripDraft } from "./types";
+import type { SuitcasePlan, SuitcaseSize } from "./suitcases";
 
 export type UserInput = {
   id?: string;
@@ -36,10 +37,40 @@ export async function ensureUser(input: UserInput) {
   });
 }
 
+function defaultPlans(
+  ownerName: string,
+  partnerName?: string
+): SuitcasePlan[] {
+  const plans: SuitcasePlan[] = [
+    {
+      id: "auto-1",
+      name: `Koffer 1 (${ownerName})`,
+      size: "MEDIUM",
+      ownerRole: "owner",
+    },
+  ];
+  if (partnerName) {
+    plans.push({
+      id: "auto-2",
+      name: `Koffer 2 (${partnerName})`,
+      size: "MEDIUM",
+      ownerRole: "partner",
+    });
+  }
+  plans.push({
+    id: "auto-shared",
+    name: "Handgepäck / Shared",
+    size: "CABIN",
+    ownerRole: "shared",
+  });
+  return plans;
+}
+
 export async function createTripFromDraft(
   draft: TripDraft,
   owner: UserInput,
-  partner?: UserInput
+  partner?: UserInput,
+  suitcasePlans?: SuitcasePlan[]
 ) {
   const user = await ensureUser(owner);
   let inviteCode = generateInviteCode();
@@ -65,6 +96,21 @@ export async function createTripFromDraft(
   ];
 
   const items = calculatePackList(draft.legs, travelers);
+  const plans =
+    suitcasePlans && suitcasePlans.length > 0
+      ? suitcasePlans
+      : defaultPlans(user.name, partner?.name);
+
+  let partnerUserId: string | undefined;
+  let partnerUser = null as Awaited<ReturnType<typeof ensureUser>> | null;
+  if (partner?.name) {
+    partnerUser = await ensureUser({
+      name: partner.name,
+      color: partner.color ?? USER_COLORS[1],
+      gender: partner.gender,
+    });
+    partnerUserId = partnerUser.id;
+  }
 
   const trip = await prisma.trip.create({
     data: {
@@ -74,7 +120,12 @@ export async function createTripFromDraft(
       inviteCode,
       ownerId: user.id,
       members: {
-        create: { userId: user.id, role: "OWNER" },
+        create: [
+          { userId: user.id, role: "OWNER" },
+          ...(partnerUser
+            ? [{ userId: partnerUser.id, role: "PARTNER" as const }]
+            : []),
+        ],
       },
       legs: {
         create: draft.legs.map((leg, idx) => ({
@@ -90,18 +141,21 @@ export async function createTripFromDraft(
         })),
       },
       suitcases: {
-        create: [
-          { name: `Koffer 1 (${user.name})`, ownerUserId: user.id },
-          ...(partner?.name
-            ? [
-                {
-                  name: `Koffer 2 (${partner.name})`,
-                  ownerUserId: undefined as string | undefined,
-                },
-              ]
-            : []),
-          { name: "Handgepäck / Shared", ownerUserId: user.id },
-        ],
+        create: plans.map((plan) => {
+          const isShared = plan.ownerRole === "shared";
+          const ownerUserId =
+            plan.ownerRole === "owner"
+              ? user.id
+              : plan.ownerRole === "partner"
+                ? partnerUserId
+                : user.id;
+          return {
+            name: plan.name,
+            size: plan.size as SuitcaseSize,
+            isShared,
+            ownerUserId: ownerUserId || user.id,
+          };
+        }),
       },
       items: {
         create: items.map((item) => ({
@@ -123,56 +177,24 @@ export async function createTripFromDraft(
     },
   });
 
-  let partnerUserId: string | undefined;
-  if (partner?.name) {
-    const partnerUser = await ensureUser({
-      name: partner.name,
-      color: partner.color ?? USER_COLORS[1],
-      gender: partner.gender,
-    });
-    partnerUserId = partnerUser.id;
-    await prisma.tripMember.create({
-      data: { tripId: trip.id, userId: partnerUser.id, role: "PARTNER" },
-    });
-    const partnerBag = trip.suitcases.find((s) =>
-      s.name.includes(partner.name)
-    );
-    if (partnerBag) {
-      await prisma.suitcase.update({
-        where: { id: partnerBag.id },
-        data: {
-          name: `Koffer 2 (${partner.name})`,
-          ownerUserId: partnerUser.id,
-        },
-      });
-    }
-  }
-
-  const sharedBag = trip.suitcases.find((s) => s.name.includes("Shared"));
-  const ownerBag = trip.suitcases.find((s) => s.ownerUserId === user.id && !s.name.includes("Shared"));
-  const partnerBag = partnerUserId
-    ? trip.suitcases.find((s) => s.name.includes(partner!.name))
-    : undefined;
-
-  // Re-fetch suitcases after partner update
-  const bags = await prisma.suitcase.findMany({ where: { tripId: trip.id } });
-  const shared = bags.find((s) => s.name.includes("Shared"));
-  const bagOwner = bags.find(
-    (s) => s.ownerUserId === user.id && !s.name.includes("Shared")
+  const bags = trip.suitcases;
+  const shared = bags.find((s) => s.isShared) || bags.find((s) => s.size === "CABIN");
+  const ownerBags = bags.filter(
+    (s) => !s.isShared && s.ownerUserId === user.id
   );
-  const bagPartner = partnerUserId
-    ? bags.find((s) => s.ownerUserId === partnerUserId)
-    : undefined;
+  const partnerBags = partnerUserId
+    ? bags.filter((s) => !s.isShared && s.ownerUserId === partnerUserId)
+    : [];
 
   await Promise.all(
     trip.items.map(async (item, idx) => {
       const calc = items[idx];
-      let suitcaseId = shared?.id ?? sharedBag?.id;
+      let suitcaseId = shared?.id;
       if (calc && !calc.isShared) {
         if (calc.assigneeKey === user.id) {
-          suitcaseId = bagOwner?.id ?? ownerBag?.id ?? suitcaseId;
+          suitcaseId = ownerBags[0]?.id ?? suitcaseId;
         } else if (calc.assigneeKey === "partner-pending") {
-          suitcaseId = bagPartner?.id ?? partnerBag?.id ?? suitcaseId;
+          suitcaseId = partnerBags[0]?.id ?? suitcaseId;
         }
       }
       if (!suitcaseId) return;
@@ -198,7 +220,7 @@ export const tripInclude = {
     },
     orderBy: [{ category: "asc" as const }, { name: "asc" as const }],
   },
-  suitcases: { include: { owner: true } },
+  suitcases: { include: { owner: true }, orderBy: { name: "asc" as const } },
   members: { include: { user: true } },
   owner: true,
 };

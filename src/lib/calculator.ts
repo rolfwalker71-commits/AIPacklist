@@ -246,8 +246,20 @@ function personalItemsForTraveler(
   }
 
   push("Medikamente (persönlich)", "Gesundheit", 1);
-  push("Handy-Ladegerät", "Technik", 1);
+  push("Zahnbürste & Zahnpasta", "Toiletries", 1);
+  push("Handy-Ladekabel / Netzteil", "Technik", 1);
+  push("Powerbank", "Technik", 1);
   push("Bequeme Schuhe Alltag", "Schuhe", 1);
+
+  // Personal documents & entry paperwork — never shared
+  push("Reisepass / Ausweis", "Dokumente", 1);
+  push("Tickets / Bordkarten (persönlich)", "Dokumente", 1);
+  if (hasTransport(legs, "FLIGHT") || hasTransport(legs, "SHIP")) {
+    push("Einreiseformulare (ESTA / ETA / Visa)", "Dokumente", 1, {
+      notes: "Persönlich ausfüllen und mitführen",
+    });
+    push("Reiseadapter", "Technik", 1);
+  }
 
   return items;
 }
@@ -296,7 +308,7 @@ export function calculatePackList(
     );
   }
 
-  // Shared couple / group essentials
+  // Shared couple / group essentials (nur wirklich Teilbare)
   if (hasTag(legs, "tropical") || hasTag(legs, "hot")) {
     pushShared("Sonnencreme SPF50", "Toiletries", 1);
   }
@@ -306,26 +318,18 @@ export function calculatePackList(
   if (hasTransport(legs, "SHIP")) {
     pushShared("Seekrankheitsmittel / Ingwer", "Gesundheit", 1);
     pushShared("Kabinen-Organizer / Magnettaschen", "Technik", 1);
-    pushShared("Adapter / Powerbank", "Technik", 1);
   }
   if (hasTransport(legs, "FLIGHT")) {
-    // one set shared is fine for couples; still personal-ish but shareable
     pushShared("Nackenkissen / Schlafmaske (Shared)", "Reise", 1);
+    pushShared("Handgepäck-Essentials Check", "Reise", 1);
   }
   if (hasTransport(legs, "CAR")) {
     pushShared("Ladekabel Auto", "Technik", 1);
     pushShared("Snacks für unterwegs", "Reise", 1);
   }
 
-  pushShared("Zahnbürste & Zahnpasta", "Toiletries", 1);
   pushShared("Duschgel / Shampoo", "Toiletries", 1);
   pushShared("Erste-Hilfe-Mini", "Gesundheit", 1);
-  pushShared("Dokumente / Reisepass / Tickets", "Dokumente", 1);
-
-  // Flight hand luggage note as shared checklist
-  if (hasTransport(legs, "FLIGHT")) {
-    pushShared("Handgepäck-Essentials Check", "Reise", 1);
-  }
 
   return items;
 }

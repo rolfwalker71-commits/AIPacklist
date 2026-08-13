@@ -86,15 +86,24 @@ model Leg {
 }
 
 model Suitcase {
-  id          String  @id @default(cuid())
+  id          String       @id @default(cuid())
   name        String
+  size        SuitcaseSize @default(MEDIUM)
   ownerUserId String?
+  isShared    Boolean      @default(false)
 
   tripId String
   trip   Trip  @relation(fields: [tripId], references: [id], onDelete: Cascade)
   owner  User? @relation(fields: [ownerUserId], references: [id])
 
   items PackItem[]
+}
+
+enum SuitcaseSize {
+  CABIN
+  MEDIUM
+  LARGE
+  XL
 }
 
 model PackItem {
