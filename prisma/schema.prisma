@@ -1,0 +1,119 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum MemberRole {
+  OWNER
+  PARTNER
+}
+
+enum Transport {
+  SHIP
+  FLIGHT
+  CAR
+  TRAIN
+  OTHER
+}
+
+enum Gender {
+  FEMALE
+  MALE
+  UNSPECIFIED
+}
+
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  color     String   @default("#0F766E")
+  gender    Gender   @default(UNSPECIFIED)
+  createdAt DateTime @default(now())
+
+  ownedTrips  Trip[]         @relation("TripOwner")
+  memberships TripMember[]
+  suitcases   Suitcase[]
+  packedItems PackItem[]     @relation("PackedBy")
+}
+
+model Trip {
+  id         String   @id @default(cuid())
+  title      String
+  startDate  DateTime
+  endDate    DateTime
+  inviteCode String   @unique
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  ownerId String
+  owner   User   @relation("TripOwner", fields: [ownerId], references: [id])
+
+  members   TripMember[]
+  legs      Leg[]
+  suitcases Suitcase[]
+  items     PackItem[]
+}
+
+model TripMember {
+  id     String     @id @default(cuid())
+  role   MemberRole @default(PARTNER)
+  tripId String
+  userId String
+
+  trip Trip @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([tripId, userId])
+}
+
+model Leg {
+  id                  String    @id @default(cuid())
+  name                String
+  startDate           DateTime
+  endDate             DateTime
+  transport           Transport @default(OTHER)
+  laundryAvailable    Boolean   @default(false)
+  laundryIntervalDays Int?
+  weatherTags         String    @default("[]")
+  dressCodes          String    @default("[]")
+  sortOrder           Int       @default(0)
+
+  tripId String
+  trip   Trip   @relation(fields: [tripId], references: [id], onDelete: Cascade)
+}
+
+model Suitcase {
+  id          String  @id @default(cuid())
+  name        String
+  ownerUserId String?
+
+  tripId String
+  trip   Trip  @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  owner  User? @relation(fields: [ownerUserId], references: [id])
+
+  items PackItem[]
+}
+
+model PackItem {
+  id             String    @id @default(cuid())
+  name           String
+  category       String
+  quantity       Int       @default(1)
+  isShared       Boolean   @default(false)
+  notes          String?
+  source         String    @default("calculator")
+  packedAt       DateTime?
+  packedByUserId String?
+  suitcaseId     String?
+
+  tripId String
+  trip   Trip  @relation(fields: [tripId], references: [id], onDelete: Cascade)
+
+  packedBy User?     @relation("PackedBy", fields: [packedByUserId], references: [id])
+  suitcase Suitcase? @relation(fields: [suitcaseId], references: [id])
+
+  @@index([tripId])
+}

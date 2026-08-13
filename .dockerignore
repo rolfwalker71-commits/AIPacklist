@@ -1,0 +1,12 @@
+node_modules
+.next
+data/*.db
+data/*.db-journal
+.env
+.env.local
+*.log
+.DS_Store
+.claude
+.agents
+.windsurf
+skills-lock.json

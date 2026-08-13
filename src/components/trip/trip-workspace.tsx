@@ -1,0 +1,445 @@
+"use client";
+
+import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  Briefcase,
+  Check,
+  Link2,
+  Users,
+  Luggage,
+  Share2,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { GenderPicker } from "@/components/ui/gender-picker";
+import { cn, formatDate } from "@/lib/utils";
+import { ensureLocalUser, setLocalUser, type LocalUser } from "@/lib/local-user";
+import type { PackGender } from "@/lib/types";
+
+type PackItem = {
+  id: string;
+  name: string;
+  category: string;
+  quantity: number;
+  isShared: boolean;
+  notes: string | null;
+  packedAt: string | null;
+  packedByUserId: string | null;
+  suitcaseId: string | null;
+  packedBy?: { id: string; name: string; color: string } | null;
+  suitcase?: { id: string; name: string } | null;
+};
+
+type Trip = {
+  id: string;
+  title: string;
+  inviteCode: string;
+  startDate: string;
+  endDate: string;
+  legs: {
+    id: string;
+    name: string;
+    transport: string;
+    laundryAvailable: boolean;
+    weatherTags: string[];
+    dressCodes: string[];
+    startDate: string;
+    endDate: string;
+  }[];
+  items: PackItem[];
+  suitcases: {
+    id: string;
+    name: string;
+    ownerUserId: string | null;
+    owner?: { name: string } | null;
+  }[];
+  members: {
+    role: string;
+    user: { id: string; name: string; color: string; gender?: string };
+  }[];
+};
+
+export function TripWorkspace({ initialTrip }: { initialTrip: Trip }) {
+  const [trip, setTrip] = useState(initialTrip);
+  const [user, setUser] = useState<LocalUser | null>(null);
+  const [filter, setFilter] = useState<"all" | "open" | "packed" | "shared">(
+    "all"
+  );
+  const [suitcaseFilter, setSuitcaseFilter] = useState<string>("all");
+  const [nameDraft, setNameDraft] = useState("");
+  const [genderDraft, setGenderDraft] = useState<PackGender>("UNSPECIFIED");
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    const u = ensureLocalUser();
+    setUser(u);
+    setNameDraft(u.name);
+    setGenderDraft(u.gender || "UNSPECIFIED");
+  }, []);
+
+  useEffect(() => {
+    const es = new EventSource(`/api/trips/${trip.id}/events`);
+    es.onmessage = (msg) => {
+      try {
+        const event = JSON.parse(msg.data);
+        if (event.type === "item_updated" && event.payload) {
+          setTrip((prev) => {
+            const exists = prev.items.some((i) => i.id === event.itemId);
+            const items = exists
+              ? prev.items.map((i) =>
+                  i.id === event.itemId ? { ...i, ...event.payload } : i
+                )
+              : event.payload.created
+                ? [...prev.items, event.payload]
+                : prev.items;
+            return { ...prev, items };
+          });
+        }
+        if (event.type === "member_joined") {
+          // soft refresh members
+          fetch(`/api/trips/${trip.id}`)
+            .then((r) => r.json())
+            .then(setTrip)
+            .catch(() => undefined);
+        }
+      } catch {
+        // ignore
+      }
+    };
+    return () => es.close();
+  }, [trip.id]);
+
+  const saveName = () => {
+    if (!user || !nameDraft.trim()) return;
+    const next = { ...user, name: nameDraft.trim(), gender: genderDraft };
+    setLocalUser(next);
+    setUser(next);
+    fetch(`/api/trips/${trip.id}/members`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ user: next, inviteCode: trip.inviteCode }),
+    }).catch(() => undefined);
+  };
+
+  const togglePacked = useCallback(
+    async (item: PackItem) => {
+      if (!user) return;
+      const packed = !item.packedAt;
+      // optimistic
+      setTrip((prev) => ({
+        ...prev,
+        items: prev.items.map((i) =>
+          i.id === item.id
+            ? {
+                ...i,
+                packedAt: packed ? new Date().toISOString() : null,
+                packedByUserId: packed ? user.id : null,
+                packedBy: packed
+                  ? { id: user.id, name: user.name, color: user.color }
+                  : null,
+              }
+            : i
+        ),
+      }));
+
+      await fetch(`/api/trips/${trip.id}/items`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          itemId: item.id,
+          packed,
+          userId: user.id,
+          userName: user.name,
+          userColor: user.color,
+        }),
+      });
+    },
+    [trip.id, user]
+  );
+
+  const moveSuitcase = async (itemId: string, suitcaseId: string) => {
+    setTrip((prev) => ({
+      ...prev,
+      items: prev.items.map((i) =>
+        i.id === itemId
+          ? {
+              ...i,
+              suitcaseId,
+              suitcase: prev.suitcases.find((s) => s.id === suitcaseId) || null,
+            }
+          : i
+      ),
+    }));
+    await fetch(`/api/trips/${trip.id}/items`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ itemId, suitcaseId }),
+    });
+  };
+
+  const filtered = useMemo(() => {
+    return trip.items.filter((item) => {
+      if (filter === "open" && item.packedAt) return false;
+      if (filter === "packed" && !item.packedAt) return false;
+      if (filter === "shared" && !item.isShared) return false;
+      if (suitcaseFilter !== "all" && item.suitcaseId !== suitcaseFilter)
+        return false;
+      return true;
+    });
+  }, [trip.items, filter, suitcaseFilter]);
+
+  const byCategory = useMemo(() => {
+    const map = new Map<string, PackItem[]>();
+    for (const item of filtered) {
+      if (!map.has(item.category)) map.set(item.category, []);
+      map.get(item.category)!.push(item);
+    }
+    return [...map.entries()];
+  }, [filtered]);
+
+  const progress = useMemo(() => {
+    const total = trip.items.length || 1;
+    const packed = trip.items.filter((i) => i.packedAt).length;
+    return Math.round((packed / total) * 100);
+  }, [trip.items]);
+
+  const copyInvite = async () => {
+    const url = `${window.location.origin}/join?code=${trip.inviteCode}`;
+    await navigator.clipboard.writeText(url);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <div className="space-y-8">
+      <header className="space-y-4">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-amber-800">
+              FlexiPack Trip
+            </p>
+            <h1 className="font-display text-3xl text-stone-950 md:text-4xl">
+              {trip.title}
+            </h1>
+            <p className="mt-1 text-stone-600">
+              {formatDate(trip.startDate)} – {formatDate(trip.endDate)} ·{" "}
+              {trip.legs.length} Etappen
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" onClick={copyInvite}>
+              <Share2 className="h-4 w-4" />
+              {copied ? "Kopiert" : `Code ${trip.inviteCode}`}
+            </Button>
+          </div>
+        </div>
+
+        <div className="h-2 overflow-hidden rounded-full bg-stone-200">
+          <div
+            className="h-full rounded-full bg-teal-700 transition-all duration-500"
+            style={{ width: `${progress}%` }}
+          />
+        </div>
+        <p className="text-sm text-stone-600">{progress}% gepackt</p>
+
+        <div className="grid gap-4 rounded-2xl border border-stone-200 bg-white/70 p-4 md:grid-cols-3">
+          <div className="space-y-3">
+            <div>
+              <Label>Dein Name</Label>
+              <div className="flex gap-2">
+                <Input
+                  value={nameDraft}
+                  onChange={(e) => setNameDraft(e.target.value)}
+                />
+                <Button variant="secondary" onClick={saveName}>
+                  Speichern
+                </Button>
+              </div>
+            </div>
+            <GenderPicker value={genderDraft} onChange={setGenderDraft} />
+          </div>
+          <div>
+            <Label className="flex items-center gap-1">
+              <Users className="h-3 w-3" /> Mitreisende
+            </Label>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {trip.members.map((m) => (
+                <span
+                  key={m.user.id}
+                  className="inline-flex items-center gap-2 rounded-full border border-stone-200 bg-stone-50 px-3 py-1 text-xs"
+                >
+                  <span
+                    className="h-2.5 w-2.5 rounded-full"
+                    style={{ background: m.user.color }}
+                  />
+                  {m.user.name}
+                  <span className="text-stone-400">{m.role}</span>
+                </span>
+              ))}
+            </div>
+          </div>
+          <div>
+            <Label className="flex items-center gap-1">
+              <Link2 className="h-3 w-3" /> Invite
+            </Label>
+            <p className="mt-2 text-sm text-stone-600">
+              Partner:in mit Code <strong>{trip.inviteCode}</strong> beitreten.
+              Shared Items erscheinen live als „Gepackt von …“.
+            </p>
+          </div>
+        </div>
+      </header>
+
+      <section className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+        {trip.legs.map((leg) => (
+          <div
+            key={leg.id}
+            className="rounded-2xl border border-teal-100 bg-gradient-to-br from-teal-50 to-white p-4"
+          >
+            <div className="text-xs font-semibold uppercase tracking-wide text-teal-800">
+              {leg.transport}
+            </div>
+            <h3 className="mt-1 font-semibold text-stone-900">{leg.name}</h3>
+            <p className="mt-1 text-xs text-stone-500">
+              {formatDate(leg.startDate)} – {formatDate(leg.endDate)}
+            </p>
+            <p className="mt-2 text-xs text-stone-600">
+              Wäsche: {leg.laundryAvailable ? "Ja" : "Nein"} ·{" "}
+              {(leg.weatherTags || []).join(", ")}
+            </p>
+          </div>
+        ))}
+      </section>
+
+      <section className="space-y-4">
+        <div className="flex flex-wrap items-center gap-2">
+          {(
+            [
+              ["all", "Alle"],
+              ["open", "Offen"],
+              ["packed", "Gepackt"],
+              ["shared", "Shared"],
+            ] as const
+          ).map(([id, label]) => (
+            <button
+              key={id}
+              type="button"
+              onClick={() => setFilter(id)}
+              className={cn(
+                "rounded-full border px-3 py-1.5 text-xs font-semibold",
+                filter === id
+                  ? "border-teal-800 bg-teal-800 text-white"
+                  : "border-stone-200 bg-white text-stone-600"
+              )}
+            >
+              {label}
+            </button>
+          ))}
+          <select
+            className="ml-auto rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm"
+            value={suitcaseFilter}
+            onChange={(e) => setSuitcaseFilter(e.target.value)}
+          >
+            <option value="all">Alle Koffer</option>
+            {trip.suitcases.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="grid gap-3 md:grid-cols-3">
+          {trip.suitcases.map((s) => {
+            const count = trip.items.filter((i) => i.suitcaseId === s.id).length;
+            const packed = trip.items.filter(
+              (i) => i.suitcaseId === s.id && i.packedAt
+            ).length;
+            return (
+              <div
+                key={s.id}
+                className="flex items-center gap-3 rounded-xl border border-stone-200 bg-white/80 px-4 py-3"
+              >
+                <Luggage className="h-5 w-5 text-teal-800" />
+                <div>
+                  <div className="text-sm font-semibold">{s.name}</div>
+                  <div className="text-xs text-stone-500">
+                    {packed}/{count} Items
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="space-y-6">
+          {byCategory.map(([category, items]) => (
+            <div key={category}>
+              <h3 className="mb-2 flex items-center gap-2 font-display text-lg text-stone-900">
+                <Briefcase className="h-4 w-4 text-teal-800" />
+                {category}
+              </h3>
+              <ul className="space-y-2">
+                {items.map((item) => (
+                  <li
+                    key={item.id}
+                    className={cn(
+                      "flex flex-col gap-2 rounded-xl border px-3 py-3 transition sm:flex-row sm:items-center",
+                      item.packedAt
+                        ? "border-teal-200 bg-teal-50/60"
+                        : "border-stone-200 bg-white/80"
+                    )}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => togglePacked(item)}
+                      className={cn(
+                        "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border",
+                        item.packedAt
+                          ? "border-teal-700 bg-teal-700 text-white"
+                          : "border-stone-300 bg-white text-transparent"
+                      )}
+                      aria-label="Toggle packed"
+                    >
+                      <Check className="h-4 w-4" />
+                    </button>
+                    <div className="min-w-0 flex-1">
+                      <div className="font-medium text-stone-900">
+                        {item.quantity}× {item.name}
+                        {item.isShared && (
+                          <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-900">
+                            Shared
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-xs text-stone-500">
+                        {item.notes}
+                        {item.packedAt && item.packedBy && (
+                          <span className="ml-1 font-medium text-teal-800">
+                            · Gepackt von {item.packedBy.name}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <select
+                      className="rounded-lg border border-stone-200 bg-white px-2 py-1.5 text-xs"
+                      value={item.suitcaseId || ""}
+                      onChange={(e) => moveSuitcase(item.id, e.target.value)}
+                    >
+                      {trip.suitcases.map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {s.name}
+                        </option>
+                      ))}
+                    </select>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+      </section>
+    </div>
+  );
+}

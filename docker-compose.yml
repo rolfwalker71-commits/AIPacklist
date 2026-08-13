@@ -1,0 +1,14 @@
+services:
+  flexipack:
+    build: .
+    image: ghcr.io/rolfwalker71-commits/aipacklist:latest
+    ports:
+      - "3000:3000"
+    volumes:
+      - flexipack-data:/app/data
+    environment:
+      DATABASE_URL: file:/app/data/flexipack.db
+      NODE_ENV: production
+
+volumes:
+  flexipack-data:
