@@ -20,13 +20,17 @@ npm run db:migrate
 npm run dev
 ```
 
-App: [http://localhost:3000](http://localhost:3000)
+App: [http://localhost:3330](http://localhost:3330)
 
 ## Docker
+
+Ja — `docker-compose.yml` im Projektroot ist die Datei zum Starten. Für einen Single-Container mit SQLite reicht das:
 
 ```bash
 docker compose up --build
 ```
+
+App dann unter [http://localhost:3330](http://localhost:3330).
 
 Persistente DB: Volume `flexipack-data` → `/app/data/flexipack.db`
 
@@ -34,7 +38,7 @@ Image (nach CI Push):
 
 ```bash
 docker pull ghcr.io/rolfwalker71-commits/aipacklist:latest
-docker run -p 3000:3000 -v flexipack-data:/app/data ghcr.io/rolfwalker71-commits/aipacklist:latest
+docker run -p 3330:3330 -v flexipack-data:/app/data ghcr.io/rolfwalker71-commits/aipacklist:latest
 ```
 
 ## Tech

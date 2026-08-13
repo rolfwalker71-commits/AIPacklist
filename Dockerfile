@@ -4,7 +4,8 @@ FROM node:22-alpine AS deps
 WORKDIR /app
 RUN apk add --no-cache libc6-compat
 COPY package.json package-lock.json ./
-RUN npm ci
+# postinstall runs prisma generate — schema is not present in this stage yet
+RUN npm ci --ignore-scripts
 
 FROM node:22-alpine AS builder
 WORKDIR /app
@@ -21,7 +22,7 @@ FROM node:22-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
-ENV PORT=3000
+ENV PORT=3330
 ENV HOSTNAME=0.0.0.0
 ENV DATABASE_URL="file:/app/data/flexipack.db"
 
@@ -46,7 +47,7 @@ RUN chmod +x ./docker-entrypoint.sh \
   && chown -R nextjs:nodejs /app
 
 USER nextjs
-EXPOSE 3000
+EXPOSE 3330
 VOLUME ["/app/data"]
 ENTRYPOINT ["./docker-entrypoint.sh"]
 CMD ["node", "server.js"]
