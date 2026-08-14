@@ -173,6 +173,7 @@ model PackItem {
   packedAt       DateTime?
   packedByUserId String?
   suitcaseId     String?
+  photoUrl       String?
 
   tripId String
   trip   Trip  @relation(fields: [tripId], references: [id], onDelete: Cascade)

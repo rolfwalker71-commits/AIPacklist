@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Briefcase,
+  Camera,
   Check,
   ChevronDown,
   ChevronRight,
@@ -17,6 +18,7 @@ import {
   X,
   Printer,
   CloudSun,
+  Layers2,
 } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -46,6 +48,7 @@ import {
   resolvePriority,
   type PackPriority,
 } from "@/lib/priority";
+import { findDuplicateGroups, type CleanupItem } from "@/lib/pack-cleanup";
 
 type SessionUserProp = {
   id: string;
@@ -76,6 +79,7 @@ type PackItem = {
   packedAt: string | null;
   packedByUserId: string | null;
   suitcaseId: string | null;
+  photoUrl?: string | null;
   packedBy?: MemberUser | null;
   suitcase?: {
     id: string;
@@ -284,6 +288,7 @@ function openStats(items: PackItem[], trip: Trip): {
 }
 
 const EARLY_SECTION_KEY = "__early__";
+const DAY_OF_SECTION_KEY = "__day_of__";
 
 function loadOpenSections(tripId: string): Record<string, boolean> {
   if (typeof window === "undefined") return {};
@@ -379,6 +384,10 @@ export function TripWorkspace({
   });
   const [legBusy, setLegBusy] = useState(false);
   const [weatherBusy, setWeatherBusy] = useState(false);
+  const [cleanupBusy, setCleanupBusy] = useState(false);
+  const [photoBusyId, setPhotoBusyId] = useState<string | null>(null);
+  const photoInputRef = useRef<HTMLInputElement>(null);
+  const photoTargetId = useRef<string | null>(null);
 
   useEffect(() => {
     setUser(sessionUser);
@@ -696,6 +705,112 @@ export function TripWorkspace({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ itemId }),
     });
+  };
+
+  const cleanupDuplicates = async () => {
+    setCleanupBusy(true);
+    setAiMessage(null);
+    try {
+      const res = await fetch(
+        `/api/trips/${trip.id}/items/cleanup-duplicates`,
+        { method: "POST" }
+      );
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setAiMessage(
+          typeof data.error === "string"
+            ? data.error
+            : "Aufräumen fehlgeschlagen"
+        );
+        return;
+      }
+      setTrip({ ...data, aiInsights: normalizeInsights(data.aiInsights) });
+      setAiMessage(
+        typeof data.message === "string"
+          ? data.message
+          : "Duplikate zusammengeführt"
+      );
+    } catch (e) {
+      setAiMessage(e instanceof Error ? e.message : "Aufräumen fehlgeschlagen");
+    } finally {
+      setCleanupBusy(false);
+    }
+  };
+
+  const pickItemPhoto = (itemId: string) => {
+    photoTargetId.current = itemId;
+    photoInputRef.current?.click();
+  };
+
+  const onItemPhotoSelected = async (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = e.target.files?.[0];
+    const itemId = photoTargetId.current;
+    e.target.value = "";
+    if (!file || !itemId) return;
+    setPhotoBusyId(itemId);
+    setAiMessage(null);
+    try {
+      const body = new FormData();
+      body.append("file", file);
+      body.append("itemId", itemId);
+      const res = await fetch(`/api/trips/${trip.id}/items/photo`, {
+        method: "POST",
+        body,
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setAiMessage(
+          typeof data.error === "string" ? data.error : "Foto fehlgeschlagen"
+        );
+        return;
+      }
+      if (data.trip) {
+        setTrip({
+          ...data.trip,
+          aiInsights: normalizeInsights(data.trip.aiInsights),
+        });
+      } else if (data.item) {
+        setTrip((prev) => ({
+          ...prev,
+          items: prev.items.map((i) =>
+            i.id === itemId ? { ...i, photoUrl: data.item.photoUrl } : i
+          ),
+        }));
+      }
+    } catch (err) {
+      setAiMessage(err instanceof Error ? err.message : "Foto fehlgeschlagen");
+    } finally {
+      setPhotoBusyId(null);
+      photoTargetId.current = null;
+    }
+  };
+
+  const removeItemPhoto = async (itemId: string) => {
+    setPhotoBusyId(itemId);
+    try {
+      const res = await fetch(`/api/trips/${trip.id}/items/photo`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ itemId }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setAiMessage(
+          typeof data.error === "string" ? data.error : "Foto löschen fehlgeschlagen"
+        );
+        return;
+      }
+      setTrip((prev) => ({
+        ...prev,
+        items: prev.items.map((i) =>
+          i.id === itemId ? { ...i, photoUrl: null } : i
+        ),
+      }));
+    } finally {
+      setPhotoBusyId(null);
+    }
   };
 
   const saveSuitcase = async (payload: {
@@ -1055,10 +1170,19 @@ export function TripWorkspace({
     [filtered]
   );
 
+  const dayOfItems = useMemo(
+    () =>
+      filtered
+        .filter((i) => resolvePriority(i) === "DAY_OF")
+        .sort(sortItems),
+    [filtered]
+  );
+
   const byCategory = useMemo(() => {
     const map = new Map<string, PackItem[]>();
     for (const item of filtered) {
-      if (resolvePriority(item) === "EARLY") continue;
+      const p = resolvePriority(item);
+      if (p === "EARLY" || p === "DAY_OF") continue;
       if (!map.has(item.category)) map.set(item.category, []);
       map.get(item.category)!.push(item);
     }
@@ -1066,6 +1190,39 @@ export function TripWorkspace({
       ([cat, items]) => [cat, [...items].sort(sortItems)] as const
     );
   }, [filtered]);
+
+  const duplicatePreview = useMemo(() => {
+    const cleanupItems: CleanupItem[] = trip.items.map((i) => {
+      const noteMatch = i.notes?.match(/für\s+([^·]+)/i);
+      const fromNote = noteMatch
+        ? trip.members.find(
+            (m) =>
+              m.user.name.toLowerCase() === noteMatch[1].trim().toLowerCase()
+          )?.user.id
+        : null;
+      const bag = trip.suitcases.find((s) => s.id === i.suitcaseId);
+      const fromBag =
+        bag && !bag.isShared && bag.ownerUserId ? bag.ownerUserId : null;
+      return {
+        id: i.id,
+        name: i.name,
+        quantity: i.quantity,
+        isShared: i.isShared,
+        notes: i.notes,
+        priority: (i.priority || "NORMAL") as PackPriority,
+        packedAt: i.packedAt,
+        photoUrl: i.photoUrl,
+        assigneeKey: i.isShared
+          ? "shared"
+          : fromNote || fromBag || undefined,
+      };
+    });
+    const groups = findDuplicateGroups(cleanupItems);
+    return {
+      groupCount: groups.length,
+      removedCount: groups.reduce((n, g) => n + g.loserIds.length, 0),
+    };
+  }, [trip.items, trip.members, trip.suitcases]);
 
   const progress = useMemo(() => {
     const total = trip.items.length || 1;
@@ -1247,6 +1404,22 @@ export function TripWorkspace({
         key={item.id}
         actions={[
           {
+            id: "photo",
+            label: item.photoUrl ? "Foto ersetzen" : "Foto",
+            tone: "neutral",
+            onClick: () => pickItemPhoto(item.id),
+          },
+          ...(item.photoUrl
+            ? [
+                {
+                  id: "photo-del",
+                  label: "Foto weg",
+                  tone: "neutral" as const,
+                  onClick: () => void removeItemPhoto(item.id),
+                },
+              ]
+            : []),
+          {
             id: "remove",
             label: "Entfernen",
             tone: "danger",
@@ -1274,6 +1447,37 @@ export function TripWorkspace({
             >
               <Check className="h-4 w-4" />
             </button>
+            {item.photoUrl ? (
+              <button
+                type="button"
+                data-no-swipe
+                onClick={() => pickItemPhoto(item.id)}
+                className="relative h-9 w-9 shrink-0 overflow-hidden rounded-lg border border-stone-200 bg-stone-100"
+                aria-label="Foto ändern"
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={item.photoUrl}
+                  alt=""
+                  width={36}
+                  height={36}
+                  decoding="async"
+                  className="h-full w-full object-cover"
+                />
+              </button>
+            ) : (
+              <button
+                type="button"
+                data-no-swipe
+                onClick={() => pickItemPhoto(item.id)}
+                disabled={photoBusyId === item.id}
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-dashed border-stone-300 bg-white/70 text-stone-400"
+                aria-label="Foto hinzufügen"
+                title="Foto hinzufügen"
+              >
+                <Camera className="h-3.5 w-3.5" />
+              </button>
+            )}
             <button
               type="button"
               onClick={() => void togglePacked(item)}
@@ -1287,7 +1491,9 @@ export function TripWorkspace({
                       "ml-2 rounded-full px-2 py-0.5 text-xs font-semibold tracking-wide",
                       priority === "EARLY"
                         ? "bg-sky-100/90 text-sky-900"
-                        : "bg-stone-200/80 text-stone-700"
+                        : priority === "DAY_OF"
+                          ? "bg-amber-100/90 text-amber-950"
+                          : "bg-stone-200/80 text-stone-700"
                     )}
                   >
                     {pLabel}
@@ -1334,20 +1540,31 @@ export function TripWorkspace({
     key: string,
     title: string,
     items: PackItem[],
-    opts?: { icon?: "clock" | "briefcase"; hint?: string }
+    opts?: {
+      icon?: "clock" | "briefcase";
+      hint?: string;
+      motif?: "day";
+    }
   ) => {
     const open = isSectionOpen(key);
     const stats = openStats(items, trip);
     const Icon = opts?.icon === "clock" ? Clock : Briefcase;
     const iconClass =
-      opts?.icon === "clock" ? "text-sky-800" : "text-teal-800";
+      opts?.icon === "clock"
+        ? key === DAY_OF_SECTION_KEY
+          ? "text-amber-800"
+          : "text-sky-800"
+        : "text-teal-800";
 
     return (
-      <div key={key} className="card-surface-muted">
+      <div key={key} className="card-surface-muted relative overflow-hidden">
+        {opts?.motif === "day" && (
+          <ChecklistMotif className="pointer-events-none absolute -right-2 top-0 h-16 w-24 opacity-20" />
+        )}
         <button
           type="button"
           onClick={() => toggleSection(key)}
-          className="flex w-full items-start gap-2 px-3.5 py-3 text-left transition hover:bg-stone-50"
+          className="relative flex w-full items-start gap-2 px-3.5 py-3 text-left transition hover:bg-stone-50"
           aria-expanded={open}
         >
           {open ? (
@@ -1385,7 +1602,7 @@ export function TripWorkspace({
           </div>
         </button>
         {open && (
-          <div className="border-t border-stone-100 px-3 pb-3 pt-2">
+          <div className="relative border-t border-stone-100 px-3 pb-3 pt-2">
             {opts?.hint && (
               <p className="mb-2 text-xs text-stone-500">{opts.hint}</p>
             )}
@@ -1515,6 +1732,42 @@ export function TripWorkspace({
 
           <PackProgressCard trip={trip} />
 
+          <input
+            ref={photoInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => void onItemPhotoSelected(e)}
+          />
+
+          {duplicatePreview.groupCount > 0 && (
+            <div className="card-surface relative overflow-hidden p-4">
+              <ChecklistMotif className="pointer-events-none absolute -right-1 bottom-0 h-20 w-28 opacity-25" />
+              <div className="relative flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-stone-900">
+                    Doppelte Positionen
+                  </p>
+                  <p className="mt-1 text-sm text-stone-600">
+                    {duplicatePreview.removedCount} ähnliche Einträge in{" "}
+                    {duplicatePreview.groupCount} Gruppe(n) — z.B. Pass und
+                    Reisepass. Mengen und Priorität werden zusammengeführt.
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  disabled={cleanupBusy}
+                  onClick={() => void cleanupDuplicates()}
+                >
+                  <Layers2 className="h-3.5 w-3.5" />
+                  {cleanupBusy ? "…" : "Aufräumen"}
+                </Button>
+              </div>
+            </div>
+          )}
+
           <div className="card-surface space-y-3 p-3.5">
             <div className="flex flex-wrap items-center gap-2">
               {(
@@ -1598,6 +1851,8 @@ export function TripWorkspace({
                       packedBy: null,
                       suitcaseId: item.suitcaseId ?? null,
                       suitcase: (item.suitcase as PackItem["suitcase"]) ?? null,
+                      photoUrl:
+                        (item as { photoUrl?: string | null }).photoUrl ?? null,
                     },
                   ],
                 };
@@ -1613,13 +1868,21 @@ export function TripWorkspace({
                 earlyItems,
                 {
                   icon: "clock",
-                  hint: "Formulare, Visa und Co. — besser Tage oder Wochen vorher erledigen.",
+                  hint: "Formulare, Visa und Co. — besser Tage oder Wochen vorher. Foto hilft bei Adaptern oder Medikamenten.",
                 }
               )}
             {byCategory.map(([category, items]) =>
               renderSection(category, category, items, { icon: "briefcase" })
             )}
-            {earlyItems.length === 0 && byCategory.length === 0 && (
+            {dayOfItems.length > 0 &&
+              renderSection(DAY_OF_SECTION_KEY, "Am Reisetag", dayOfItems, {
+                icon: "clock",
+                motif: "day",
+                hint: "Bordkarte, Schlüssel, Geldbörse — kurz vor dem Losfahren abhaken.",
+              })}
+            {earlyItems.length === 0 &&
+              byCategory.length === 0 &&
+              dayOfItems.length === 0 && (
               <div className="card-surface p-6 text-center">
                 <ChecklistMotif className="mx-auto h-24 w-36 opacity-80" />
                 <p className="mt-3 text-base text-stone-600">

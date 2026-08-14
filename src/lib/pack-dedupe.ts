@@ -94,6 +94,8 @@ function ownerKey(item: DedupeItem): string {
   return "personal";
 }
 
+export { ownerKey as dedupeOwnerKey };
+
 function tokenSet(normalized: string): Set<string> {
   return new Set(
     normalized
