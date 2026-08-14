@@ -22,7 +22,7 @@ import { Label } from "@/components/ui/label";
 import { GenderPicker } from "@/components/ui/gender-picker";
 import { DatePicker } from "@/components/ui/date-picker";
 import { SwipeRow } from "@/components/ui/swipe-row";
-import { TravelMotif, SuitcaseCardArt, ChecklistMotif } from "@/components/app/travel-motif";
+import { TravelMotif, SuitcaseCardArt, ChecklistMotif, TipsMotif, TeamMotif } from "@/components/app/travel-motif";
 import { BrandLogo } from "@/components/app/brand-logo";
 import { AddPackItemForm } from "@/components/trip/add-pack-item-form";
 import {
@@ -109,6 +109,13 @@ type Trip = {
   inviteUseCount?: number;
   inviteValid?: boolean;
   inviteInvalidReason?: string | null;
+  routeShareCode?: string | null;
+  routeShareEnabled?: boolean;
+  routeShareExpiresAt?: string | null;
+  routeShareMaxUses?: number | null;
+  routeShareUseCount?: number;
+  routeShareValid?: boolean;
+  routeShareInvalidReason?: string | null;
   startDate: string;
   endDate: string;
   aiInsights?: AiInsights;
@@ -328,11 +335,25 @@ export function TripWorkspace({
   const [profileBusy, setProfileBusy] = useState(false);
   const [participantFilter, setParticipantFilter] = useState<string[]>([]);
   const [copied, setCopied] = useState(false);
+  const [routeCopied, setRouteCopied] = useState(false);
   const [aiBusy, setAiBusy] = useState(false);
   const [aiMessage, setAiMessage] = useState<string | null>(null);
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({});
   const [activeTab, setActiveTab] = useState<TripTab>("pack");
   const [headerDetails, setHeaderDetails] = useState(false);
+  const [bagForm, setBagForm] = useState<{
+    open: boolean;
+    suitcaseId: string | null;
+    name: string;
+    size: string;
+    assignee: string;
+  }>({
+    open: false,
+    suitcaseId: null,
+    name: "",
+    size: "MEDIUM",
+    assignee: "shared",
+  });
   const [editingLegId, setEditingLegId] = useState<string | null>(null);
   const [legDraft, setLegDraft] = useState({
     name: "",
@@ -662,38 +683,63 @@ export function TripWorkspace({
     });
   };
 
-  const updateSuitcaseSize = async (suitcaseId: string, size: string) => {
-    setTrip((prev) => ({
-      ...prev,
-      suitcases: prev.suitcases.map((s) =>
-        s.id === suitcaseId ? { ...s, size } : s
-      ),
-    }));
-    const res = await fetch(`/api/trips/${trip.id}/suitcases`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ suitcaseId, size }),
-    });
-    if (res.ok) {
-      const data = await res.json();
-      setTrip({ ...data, aiInsights: normalizeInsights(data.aiInsights) });
+  const saveSuitcase = async (payload: {
+    suitcaseId?: string;
+    name: string;
+    size: string;
+    assignee: string; // "shared" | userId
+  }) => {
+    const name = payload.name.trim();
+    if (!name) {
+      setAiMessage("Koffer-Name nötig");
+      return;
     }
+    const isShared = payload.assignee === "shared";
+    const ownerUserId = isShared
+      ? trip.ownerId || user.id
+      : payload.assignee;
+    const body = {
+      name,
+      size: payload.size,
+      isShared,
+      ownerUserId,
+      ...(payload.suitcaseId ? { suitcaseId: payload.suitcaseId } : {}),
+    };
+    const res = await fetch(`/api/trips/${trip.id}/suitcases`, {
+      method: payload.suitcaseId ? "PATCH" : "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      setAiMessage(
+        typeof data.error === "string" ? data.error : "Koffer speichern fehlgeschlagen"
+      );
+      return;
+    }
+    const data = await res.json();
+    setTrip({ ...data, aiInsights: normalizeInsights(data.aiInsights) });
+  };
+
+  const updateSuitcaseSize = async (suitcaseId: string, size: string) => {
+    const bag = trip.suitcases.find((s) => s.id === suitcaseId);
+    if (!bag) return;
+    await saveSuitcase({
+      suitcaseId,
+      name: bag.name,
+      size,
+      assignee: bag.isShared ? "shared" : bag.ownerUserId || user.id,
+    });
   };
 
   const addSuitcase = async () => {
-    const res = await fetch(`/api/trips/${trip.id}/suitcases`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        name: `Koffer ${trip.suitcases.length + 1}`,
-        size: "MEDIUM",
-        ownerUserId: user?.id,
-      }),
+    setBagForm({
+      open: true,
+      suitcaseId: null,
+      name: `Koffer ${trip.suitcases.length + 1}`,
+      size: "MEDIUM",
+      assignee: user.id,
     });
-    if (res.ok) {
-      const data = await res.json();
-      setTrip({ ...data, aiInsights: normalizeInsights(data.aiInsights) });
-    }
   };
 
   const removeSuitcase = async (suitcaseId: string) => {
@@ -761,10 +807,11 @@ export function TripWorkspace({
         return;
       }
       applyTripPayload(data);
+      const base = data.added
+        ? `${data.added} KI-Einträge ergänzt`
+        : "Keine neuen KI-Einträge — Liste wirkt schon vollständig";
       setAiMessage(
-        data.added
-          ? `${data.added} KI-Einträge ergänzt`
-          : "Keine neuen KI-Einträge — Liste wirkt schon vollständig"
+        data.capacityNote ? `${base}. ${data.capacityNote}` : base
       );
     } catch (e) {
       setAiMessage(
@@ -816,8 +863,8 @@ export function TripWorkspace({
     });
   };
 
-  const saveLeg = async () => {
-    if (!editingLegId || !legDraft.name.trim()) return;
+  const saveLeg = async (): Promise<boolean> => {
+    if (!editingLegId || !legDraft.name.trim()) return false;
     setLegBusy(true);
     try {
       const res = await fetch(`/api/trips/${trip.id}/legs`, {
@@ -840,13 +887,53 @@ export function TripWorkspace({
             ? data.error
             : "Etappe konnte nicht gespeichert werden"
         );
-        return;
+        return false;
       }
       const data = await res.json();
       setTrip({ ...data, aiInsights: normalizeInsights(data.aiInsights) });
       setEditingLegId(null);
+      setAiMessage(
+        "Etappe gespeichert. Unter Tipps «Nach Routenänderung neu berechnen» für Packliste, Zuweisung und Tipps."
+      );
+      return true;
     } finally {
       setLegBusy(false);
+    }
+  };
+
+  const recalculateAfterRoute = async () => {
+    setAiBusy(true);
+    setAiMessage(null);
+    try {
+      const res = await fetch(`/api/trips/${trip.id}/ai-enrich`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ alsoInsights: true, rebalance: true }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setAiMessage(
+          typeof data.error === "string"
+            ? data.error
+            : `KI fehlgeschlagen (${res.status})`
+        );
+        return;
+      }
+      applyTripPayload(data);
+      const parts = [
+        data.added ? `${data.added} Positionen ergänzt` : "Packliste geprüft",
+        "Koffer neu zugewiesen",
+        "Tipps aktualisiert",
+      ];
+      if (data.capacityNote) parts.push(String(data.capacityNote));
+      setAiMessage(parts.join(" · "));
+      setTab("ai");
+    } catch (e) {
+      setAiMessage(
+        e instanceof Error ? e.message : "KI fehlgeschlagen (Netzwerk)"
+      );
+    } finally {
+      setAiBusy(false);
     }
   };
 
@@ -970,6 +1057,34 @@ export function TripWorkspace({
     }
     setTrip({ ...data, aiInsights: normalizeInsights(data.aiInsights) });
     setAiMessage("Einladung aktualisiert");
+  };
+
+  const copyRouteShare = async () => {
+    if (!trip.routeShareCode || trip.routeShareValid === false) {
+      setAiMessage(
+        trip.routeShareInvalidReason || "Zuerst Route-Code erzeugen"
+      );
+      return;
+    }
+    const url = `${window.location.origin}/create?route=${trip.routeShareCode}`;
+    await navigator.clipboard.writeText(url);
+    setRouteCopied(true);
+    setTimeout(() => setRouteCopied(false), 2000);
+  };
+
+  const patchRouteShare = async (body: Record<string, unknown>) => {
+    const res = await fetch(`/api/trips/${trip.id}/route-share`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      setAiMessage(data.error || "Route-Teilen konnte nicht geändert werden");
+      return;
+    }
+    setTrip({ ...data, aiInsights: normalizeInsights(data.aiInsights) });
+    setAiMessage("Route-Teilen aktualisiert");
   };
 
   const isTripOwner =
@@ -1511,6 +1626,16 @@ export function TripWorkspace({
                           ? ` · ${(leg.weatherTags || []).join(", ")}`
                           : ""}
                       </p>
+                      <div className="mt-3">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="secondary"
+                          onClick={() => startEditLeg(leg)}
+                        >
+                          Datum & Destination ändern
+                        </Button>
+                      </div>
                     </li>
                   </SwipeRow>
                 );
@@ -1630,7 +1755,24 @@ export function TripWorkspace({
                   >
                     Abbrechen
                   </Button>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    disabled={legBusy || aiBusy}
+                    onClick={() => {
+                      void (async () => {
+                        const ok = await saveLeg();
+                        if (ok) await recalculateAfterRoute();
+                      })();
+                    }}
+                  >
+                    Speichern & KI neu berechnen
+                  </Button>
                 </div>
+                <p className="mt-2 text-sm text-stone-500">
+                  Speichern aktualisiert Daten/Destination. Mit KI werden Packliste,
+                  Koffer-Zuweisung und Tipps an die neue Route angepasst.
+                </p>
               </div>
             )}
           </div>
@@ -1641,25 +1783,99 @@ export function TripWorkspace({
         <section className="space-y-4">
           <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-teal-900 via-teal-800 to-teal-700 px-4 py-5 text-teal-50 shadow-md">
             <SuitcaseCardArt className="absolute -right-2 -top-1 h-24 w-36 opacity-50" />
-            <p className="text-eyebrow text-teal-100/80">
-              Übersicht
-            </p>
+            <p className="text-eyebrow text-teal-100/80">Übersicht</p>
             <h2 className="mt-1 font-display text-section-title">Was liegt wo?</h2>
-            <p className="mt-1 max-w-[16rem] text-base text-teal-50/85">
-              Pro Koffer gepackt vs. offen — tippe einen Koffer für die Liste.
+            <p className="mt-1 max-w-[18rem] text-base text-teal-50/85">
+              Name, Grösse und Zuweisung jederzeit ändern — tippe einen Koffer.
             </p>
           </div>
 
           <div className="flex justify-end">
-            <Button
-              type="button"
-              variant="secondary"
-              size="sm"
-              onClick={addSuitcase}
-            >
+            <Button type="button" variant="secondary" size="sm" onClick={addSuitcase}>
               Koffer hinzufügen
             </Button>
           </div>
+
+          {bagForm.open && !bagForm.suitcaseId && (
+            <form
+              className="card-surface space-y-3 border-teal-200 p-4 ring-2 ring-teal-700/20"
+              onSubmit={(e) => {
+                e.preventDefault();
+                void saveSuitcase({
+                  suitcaseId: undefined,
+                  name: bagForm.name,
+                  size: bagForm.size,
+                  assignee: bagForm.assignee,
+                }).then(() =>
+                  setBagForm((f) => ({ ...f, open: false, suitcaseId: null }))
+                );
+              }}
+            >
+              <p className="text-eyebrow text-teal-800">Neuer Koffer</p>
+              <div>
+                <Label htmlFor="bag-name-new">Bezeichnung</Label>
+                <Input
+                  id="bag-name-new"
+                  value={bagForm.name}
+                  onChange={(e) =>
+                    setBagForm((f) => ({ ...f, name: e.target.value }))
+                  }
+                  placeholder="z.B. Handgepäck / Gemeinsam"
+                  required
+                  autoFocus
+                />
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <Label htmlFor="bag-size-new">Grösse</Label>
+                  <select
+                    id="bag-size-new"
+                    className="mt-1.5 flex h-12 w-full rounded-xl border border-stone-300 bg-white px-3 text-base"
+                    value={bagForm.size}
+                    onChange={(e) =>
+                      setBagForm((f) => ({ ...f, size: e.target.value }))
+                    }
+                  >
+                    {SUITCASE_SIZES.map((opt) => (
+                      <option key={opt.id} value={opt.id}>
+                        {opt.label} — {opt.hint}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <Label htmlFor="bag-assignee-new">Zugewiesen an</Label>
+                  <select
+                    id="bag-assignee-new"
+                    className="mt-1.5 flex h-12 w-full rounded-xl border border-stone-300 bg-white px-3 text-base"
+                    value={bagForm.assignee}
+                    onChange={(e) =>
+                      setBagForm((f) => ({ ...f, assignee: e.target.value }))
+                    }
+                  >
+                    <option value="shared">Gemeinsam</option>
+                    {trip.members.map((m) => (
+                      <option key={m.user.id} value={m.user.id}>
+                        {m.user.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button type="submit">Hinzufügen</Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() =>
+                    setBagForm((f) => ({ ...f, open: false, suitcaseId: null }))
+                  }
+                >
+                  Abbrechen
+                </Button>
+              </div>
+            </form>
+          )}
 
           <div className="space-y-3">
             {trip.suitcases.map((s, idx) => {
@@ -1671,14 +1887,22 @@ export function TripWorkspace({
                   ? 0
                   : Math.round((packed / bagItems.length) * 100);
               const openKey = `bag-${s.id}`;
-              const expanded = isSectionOpen(openKey);
+              const editingThis =
+                bagForm.open && bagForm.suitcaseId === s.id;
+              const expanded = isSectionOpen(openKey) || editingThis;
+              const softMax =
+                SUITCASE_SIZES.find((x) => x.id === s.size)?.softMaxItems ?? 40;
               const accent = s.isShared
                 ? "#B45309"
                 : s.owner?.color || "#0F766E";
+              const overloaded = bagItems.length > softMax;
               return (
                 <div
                   key={s.id}
-                  className="card-surface overflow-hidden"
+                  className={cn(
+                    "card-surface overflow-hidden",
+                    editingThis && "ring-2 ring-teal-700/30"
+                  )}
                 >
                   <button
                     type="button"
@@ -1693,7 +1917,7 @@ export function TripWorkspace({
                       <div className="font-display text-lg text-stone-900">
                         {s.name}
                       </div>
-                      <div className="text-xs text-stone-500">
+                      <div className="text-sm text-stone-500">
                         {SUITCASE_SIZES.find((x) => x.id === s.size)?.label ||
                           s.size}
                         {s.isShared
@@ -1703,6 +1927,7 @@ export function TripWorkspace({
                             : ""}
                         {" · "}
                         {packed}/{bagItems.length} gepackt
+                        {overloaded ? ` · knapp (~${softMax})` : ""}
                       </div>
                       <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-stone-200">
                         <div
@@ -1721,7 +1946,147 @@ export function TripWorkspace({
                     )}
                   </button>
                   {expanded && (
-                    <div className="border-t border-stone-100 px-3 pb-3 pt-2">
+                    <div className="space-y-3 border-t border-stone-100 px-3 pb-3 pt-3">
+                      {editingThis ? (
+                        <form
+                          className="space-y-3 rounded-xl border border-teal-200 bg-teal-50/40 p-3"
+                          onSubmit={(e) => {
+                            e.preventDefault();
+                            void saveSuitcase({
+                              suitcaseId: s.id,
+                              name: bagForm.name,
+                              size: bagForm.size,
+                              assignee: bagForm.assignee,
+                            }).then(() =>
+                              setBagForm((f) => ({
+                                ...f,
+                                open: false,
+                                suitcaseId: null,
+                              }))
+                            );
+                          }}
+                        >
+                          <p className="text-eyebrow text-teal-800">
+                            Koffer bearbeiten
+                          </p>
+                          <div>
+                            <Label htmlFor={`bag-name-${s.id}`}>
+                              Bezeichnung
+                            </Label>
+                            <Input
+                              id={`bag-name-${s.id}`}
+                              value={bagForm.name}
+                              onChange={(e) =>
+                                setBagForm((f) => ({
+                                  ...f,
+                                  name: e.target.value,
+                                }))
+                              }
+                              placeholder="z.B. Handgepäck / Gemeinsam"
+                              required
+                              autoFocus
+                            />
+                          </div>
+                          <div className="grid gap-3 sm:grid-cols-2">
+                            <div>
+                              <Label htmlFor={`bag-size-${s.id}`}>Grösse</Label>
+                              <select
+                                id={`bag-size-${s.id}`}
+                                className="mt-1.5 flex h-12 w-full rounded-xl border border-stone-300 bg-white px-3 text-base"
+                                value={bagForm.size}
+                                onChange={(e) =>
+                                  setBagForm((f) => ({
+                                    ...f,
+                                    size: e.target.value,
+                                  }))
+                                }
+                              >
+                                {SUITCASE_SIZES.map((opt) => (
+                                  <option key={opt.id} value={opt.id}>
+                                    {opt.label} — {opt.hint}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                            <div>
+                              <Label htmlFor={`bag-assignee-${s.id}`}>
+                                Zugewiesen an
+                              </Label>
+                              <select
+                                id={`bag-assignee-${s.id}`}
+                                className="mt-1.5 flex h-12 w-full rounded-xl border border-stone-300 bg-white px-3 text-base"
+                                value={bagForm.assignee}
+                                onChange={(e) =>
+                                  setBagForm((f) => ({
+                                    ...f,
+                                    assignee: e.target.value,
+                                  }))
+                                }
+                              >
+                                <option value="shared">Gemeinsam</option>
+                                {trip.members.map((m) => (
+                                  <option key={m.user.id} value={m.user.id}>
+                                    {m.user.name}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            <Button type="submit">Speichern</Button>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={() =>
+                                setBagForm((f) => ({
+                                  ...f,
+                                  open: false,
+                                  suitcaseId: null,
+                                }))
+                              }
+                            >
+                              Abbrechen
+                            </Button>
+                          </div>
+                        </form>
+                      ) : (
+                        <div className="flex flex-wrap gap-2">
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="secondary"
+                            onClick={() => {
+                              setOpenSections((prev) => {
+                                const next = { ...prev, [openKey]: true };
+                                saveOpenSections(trip.id, next);
+                                return next;
+                              });
+                              setBagForm({
+                                open: true,
+                                suitcaseId: s.id,
+                                name: s.name,
+                                size: s.size,
+                                assignee: s.isShared
+                                  ? "shared"
+                                  : s.ownerUserId || user.id,
+                              });
+                            }}
+                          >
+                            Bezeichnung & Zuweisung
+                          </Button>
+                          {trip.suitcases.length > 1 && (
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              className="text-rose-700"
+                              onClick={() => void removeSuitcase(s.id)}
+                            >
+                              Entfernen
+                            </Button>
+                          )}
+                        </div>
+                      )}
                       {bagItems.length === 0 ? (
                         <div className="py-4 text-center">
                           <ChecklistMotif className="mx-auto h-16 w-24 opacity-80" />
@@ -1774,8 +2139,8 @@ export function TripWorkspace({
                             ))}
                         </ul>
                       )}
-                      {idx === 0 && bagItems.length > 0 && (
-                        <p className="mt-2 text-[11px] text-stone-400">
+                      {idx === 0 && bagItems.length > 0 && !editingThis && (
+                        <p className="text-xs text-stone-400">
                           Tippe eine Zeile, um gepackt/offen umzuschalten.
                         </p>
                       )}
@@ -1790,6 +2155,16 @@ export function TripWorkspace({
 
       {activeTab === "ai" && (
         <section className="space-y-5">
+          <div className="relative overflow-hidden rounded-[1.75rem] bg-gradient-to-br from-teal-900 via-teal-800 to-amber-700 px-4 py-5 text-teal-50 shadow-md">
+            <TipsMotif className="absolute -right-1 bottom-0 h-28 w-40 opacity-50" />
+            <p className="text-eyebrow text-teal-100/80">KI & Ratgeber</p>
+            <h2 className="mt-1 font-display text-section-title">Tipps zur Reise</h2>
+            <p className="mt-1 max-w-[18rem] text-base text-teal-50/85">
+              Packliste verfeinern, Guides und Do&apos;s/Don&apos;ts — gespeichert
+              auf dieser Reise.
+            </p>
+          </div>
+
           <div className="flex flex-wrap gap-2">
             <Button onClick={enrichWithAi} disabled={aiBusy}>
               <Sparkles className="h-4 w-4" />
@@ -1803,11 +2178,23 @@ export function TripWorkspace({
               <Sparkles className="h-4 w-4" />
               Reisetipps neu generieren
             </Button>
+            <Button
+              variant="outline"
+              onClick={() => void recalculateAfterRoute()}
+              disabled={aiBusy}
+            >
+              <Sparkles className="h-4 w-4" />
+              Nach Routenänderung neu berechnen
+            </Button>
           </div>
+          <p className="text-sm text-stone-500">
+            «Neu berechnen» ergänzt fehlende Positionen, weist Koffer nach Kapazität
+            zu und aktualisiert die Reisetipps — z.B. nach geänderten Etappen.
+          </p>
 
           {!hasInsights ? (
-            <div className="rounded-2xl border border-dashed border-stone-300 bg-stone-50/60 px-4 py-8 text-center">
-              <TravelMotif className="mx-auto mb-4 h-28 w-auto max-w-[240px]" />
+            <div className="card-surface p-6 text-center">
+              <TipsMotif className="mx-auto mb-3 h-28 w-auto max-w-[240px] opacity-90" />
               <p className="font-medium text-stone-800">
                 Noch keine AI-Infos gespeichert
               </p>
@@ -1819,9 +2206,12 @@ export function TripWorkspace({
           ) : (
             <div className="space-y-5">
               {insights.tips.length > 0 && (
-                <div>
-                  <h3 className="font-display text-lg text-stone-900">Tipps</h3>
-                  <ul className="mt-2 list-disc space-y-1.5 pl-5 text-sm text-stone-700">
+                <div className="card-surface relative overflow-hidden p-4">
+                  <TipsMotif className="pointer-events-none absolute -right-2 -top-1 h-20 w-28 opacity-25" />
+                  <h3 className="relative font-display text-lg text-stone-900">
+                    Tipps
+                  </h3>
+                  <ul className="relative mt-2 list-disc space-y-1.5 pl-5 text-sm text-stone-700">
                     {insights.tips.map((tip) => (
                       <li key={tip}>{tip}</li>
                     ))}
@@ -1834,7 +2224,7 @@ export function TripWorkspace({
                   {insights.guides.map((guide) => (
                     <article
                       key={`${guide.title}-${guide.body.slice(0, 24)}`}
-                      className="rounded-xl border border-stone-200/80 bg-white/60 px-4 py-3"
+                      className="card-surface px-4 py-3"
                     >
                       <h4 className="font-semibold text-stone-900">
                         {guide.title}
@@ -1863,6 +2253,15 @@ export function TripWorkspace({
 
       {activeTab === "people" && (
         <section className="space-y-6">
+          <div className="relative overflow-hidden rounded-[1.75rem] bg-gradient-to-br from-teal-800 via-teal-700 to-blue-800 px-4 py-5 text-teal-50 shadow-md">
+            <TeamMotif className="absolute -right-1 bottom-0 h-28 w-40 opacity-50" />
+            <p className="text-eyebrow text-teal-100/80">Gruppe</p>
+            <h2 className="mt-1 font-display text-section-title">Team & Teilen</h2>
+            <p className="mt-1 max-w-[18rem] text-base text-teal-50/85">
+              Profil, Mitreisende, Pack-Einladung — und Route als Vorlage teilen.
+            </p>
+          </div>
+
           <div className="grid gap-4 rounded-2xl border border-stone-200 bg-white/70 p-4 md:grid-cols-3">
             <div className="space-y-3">
               <div>
@@ -2029,7 +2428,8 @@ export function TripWorkspace({
               )}
               <p className="mt-2 text-xs text-stone-500">
                 Partner:in muss eingeloggt sein und den Code/Link verwenden.
-                Alte Codes verfallen beim Erneuern.
+                Alte Codes verfallen beim Erneuern. Das ist die{" "}
+                <strong>gemeinsame Packliste</strong> — nicht die Route-Vorlage.
               </p>
               <div className="mt-3 flex flex-wrap gap-2">
                 <Button
@@ -2085,6 +2485,113 @@ export function TripWorkspace({
                 )}
               </div>
             </div>
+
+            <div>
+              <Label className="flex items-center gap-1">
+                <MapPinned className="h-3 w-3" /> Route teilen
+              </Label>
+              <p className="mt-2 text-sm text-stone-600">
+                Andere Gruppen starten damit eine{" "}
+                <strong>eigene Reise</strong> mit denselben Etappen — ohne
+                deine Packliste, Koffer oder Tipps.
+              </p>
+              {trip.routeShareCode ? (
+                <p className="mt-2 text-sm text-stone-600">
+                  Code <strong>{trip.routeShareCode}</strong>
+                  {trip.routeShareExpiresAt && (
+                    <>
+                      {" "}
+                      · gültig bis {formatDate(trip.routeShareExpiresAt)}
+                    </>
+                  )}
+                  {trip.routeShareMaxUses != null && (
+                    <>
+                      {" "}
+                      · {trip.routeShareUseCount ?? 0}/
+                      {trip.routeShareMaxUses}× genutzt
+                    </>
+                  )}
+                </p>
+              ) : (
+                <p className="mt-2 text-sm text-stone-500">
+                  Noch kein Route-Code — Besitzer:in kann einen erzeugen.
+                </p>
+              )}
+              {trip.routeShareCode && trip.routeShareValid === false && (
+                <p className="mt-1 text-sm text-rose-700">
+                  {trip.routeShareInvalidReason || "Route-Code ungültig"}
+                </p>
+              )}
+              <div className="mt-3 flex flex-wrap gap-2">
+                {trip.routeShareCode && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={copyRouteShare}
+                    disabled={trip.routeShareValid === false}
+                  >
+                    <Share2 className="h-3.5 w-3.5" />
+                    {routeCopied ? "Kopiert" : "Route-Link kopieren"}
+                  </Button>
+                )}
+                {isTripOwner && (
+                  <>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() =>
+                        patchRouteShare({
+                          regenerate: true,
+                          singleUse: false,
+                        })
+                      }
+                    >
+                      {trip.routeShareCode
+                        ? "Route-Code erneuern"
+                        : "Route-Code erzeugen"}
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() =>
+                        patchRouteShare({
+                          regenerate: true,
+                          singleUse: true,
+                        })
+                      }
+                    >
+                      Einmal-Route
+                    </Button>
+                    {trip.routeShareCode && (
+                      <>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() =>
+                            patchRouteShare({ extendDays: true })
+                          }
+                        >
+                          +30 Tage
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() =>
+                            patchRouteShare({
+                              enabled: !(trip.routeShareEnabled !== false),
+                            })
+                          }
+                        >
+                          {trip.routeShareEnabled === false
+                            ? "Route-Teilen aktivieren"
+                            : "Route-Teilen pausieren"}
+                        </Button>
+                      </>
+                    )}
+                  </>
+                )}
+              </div>
+            </div>
           </div>
 
           <div className="space-y-3">
@@ -2121,10 +2628,10 @@ export function TripWorkspace({
                           {s.isShared ? " · Gemeinsam" : ""}
                         </div>
                         <select
-                          className="mt-2 w-full rounded-lg border border-stone-200 bg-white px-2 py-1.5 text-xs"
+                          className="mt-2 w-full rounded-xl border border-stone-200 bg-white px-2 py-2 text-sm"
                           value={s.size}
                           onChange={(e) =>
-                            updateSuitcaseSize(s.id, e.target.value)
+                            void updateSuitcaseSize(s.id, e.target.value)
                           }
                         >
                           {SUITCASE_SIZES.map((opt) => (
@@ -2133,12 +2640,38 @@ export function TripWorkspace({
                             </option>
                           ))}
                         </select>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="secondary"
+                          className="mt-2"
+                          onClick={() => {
+                            const openKey = `bag-${s.id}`;
+                            setTab("bags");
+                            setOpenSections((prev) => {
+                              const next = { ...prev, [openKey]: true };
+                              saveOpenSections(trip.id, next);
+                              return next;
+                            });
+                            setBagForm({
+                              open: true,
+                              suitcaseId: s.id,
+                              name: s.name,
+                              size: s.size,
+                              assignee: s.isShared
+                                ? "shared"
+                                : s.ownerUserId || user.id,
+                            });
+                          }}
+                        >
+                          Name & Zuweisung
+                        </Button>
                       </div>
                       {trip.suitcases.length > 1 && (
                         <button
                           type="button"
-                          className="text-xs text-rose-600"
-                          onClick={() => removeSuitcase(s.id)}
+                          className="text-sm text-rose-600"
+                          onClick={() => void removeSuitcase(s.id)}
                         >
                           Entfernen
                         </button>

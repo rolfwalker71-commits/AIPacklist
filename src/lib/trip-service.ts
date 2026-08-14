@@ -10,6 +10,10 @@ import {
   defaultInviteExpiry,
   serializeInvite,
 } from "./invite";
+import {
+  routeShareStatus,
+  serializeRouteShare,
+} from "./route-share";
 import { inferPriority } from "./priority";
 import { USER_COLORS } from "./utils";
 import type { DressCode, PackGender, TripDraft, WeatherTag } from "./types";
@@ -240,6 +244,138 @@ export async function createTripFromDraft(
 }
 
 /**
+ * Clone only the itinerary into a fresh trip for another group.
+ * No items, no AI insights, no shared membership with the source trip.
+ */
+export async function createTripFromRouteShare(
+  sourceTripId: string,
+  owner: { id: string; name: string },
+  opts?: { title?: string }
+) {
+  const source = await prisma.trip.findUnique({
+    where: { id: sourceTripId },
+    include: { legs: { orderBy: { sortOrder: "asc" } } },
+  });
+  if (!source || source.legs.length === 0) {
+    const err = new Error("Route hat keine Etappen") as Error & {
+      status: number;
+    };
+    err.status = 400;
+    throw err;
+  }
+
+  const shareCheck = routeShareStatus({
+    routeShareCode: source.routeShareCode,
+    routeShareEnabled: source.routeShareEnabled,
+    routeShareExpiresAt: source.routeShareExpiresAt,
+    routeShareMaxUses: source.routeShareMaxUses,
+    routeShareUseCount: source.routeShareUseCount,
+  });
+  if (!shareCheck.ok) {
+    const err = new Error(shareCheck.reason || "Route-Code ungültig") as Error & {
+      status: number;
+    };
+    err.status = 400;
+    throw err;
+  }
+
+  const inviteCode = await allocateInviteCode();
+  const title =
+    (opts?.title || "").trim().slice(0, 80) ||
+    `Route: ${source.title}`.slice(0, 80);
+
+  const starts = source.legs.map((l) => l.startDate.getTime());
+  const ends = source.legs.map((l) => l.endDate.getTime());
+
+  const trip = await prisma.$transaction(async (tx) => {
+    const locked = await tx.trip.findUnique({ where: { id: source.id } });
+    if (!locked) {
+      const err = new Error("Route nicht gefunden") as Error & {
+        status: number;
+      };
+      err.status = 404;
+      throw err;
+    }
+    const again = routeShareStatus(locked);
+    if (!again.ok) {
+      const err = new Error(again.reason || "Route-Code ungültig") as Error & {
+        status: number;
+      };
+      err.status = 400;
+      throw err;
+    }
+
+    const created = await tx.trip.create({
+      data: {
+        title,
+        startDate: new Date(Math.min(...starts)),
+        endDate: new Date(Math.max(...ends)),
+        inviteCode,
+        inviteEnabled: true,
+        inviteExpiresAt: defaultInviteExpiry(),
+        inviteMaxUses: null,
+        inviteUseCount: 0,
+        ownerId: owner.id,
+        aiInsights: "{}",
+        members: {
+          create: [{ userId: owner.id, role: "OWNER" }],
+        },
+        legs: {
+          create: source.legs.map((leg, idx) => ({
+            name: leg.name,
+            location: leg.location,
+            startDate: leg.startDate,
+            endDate: leg.endDate,
+            transport: leg.transport,
+            laundryAvailable: leg.laundryAvailable,
+            laundryIntervalDays: leg.laundryIntervalDays,
+            weatherTags: leg.weatherTags,
+            dressCodes: leg.dressCodes,
+            sortOrder: idx,
+          })),
+        },
+        suitcases: {
+          create: [
+            {
+              name: `Koffer 1 (${owner.name})`,
+              size: "MEDIUM",
+              isShared: false,
+              ownerUserId: owner.id,
+            },
+            {
+              name: "Handgepäck / Gemeinsam",
+              size: "CABIN",
+              isShared: true,
+              ownerUserId: owner.id,
+            },
+          ],
+        },
+      },
+    });
+
+    const nextCount = locked.routeShareUseCount + 1;
+    const exhausted =
+      locked.routeShareMaxUses != null &&
+      nextCount >= locked.routeShareMaxUses;
+
+    await tx.trip.update({
+      where: { id: source.id },
+      data: {
+        routeShareUseCount: nextCount,
+        ...(exhausted ? { routeShareEnabled: false } : {}),
+      },
+    });
+
+    return created;
+  });
+
+  return prisma.trip.findUniqueOrThrow({
+    where: { id: trip.id },
+    include: tripInclude,
+  });
+}
+
+/**
  * When someone joins a trip after creation, create their personal suitcase
  * and personal pack items (templates/wizard only generate for travelers known
  * at create time).
@@ -400,6 +536,20 @@ export function serializeTrip(
       inviteMaxUses:
         (trip as { inviteMaxUses?: number | null }).inviteMaxUses ?? null,
       inviteUseCount: (trip as { inviteUseCount?: number }).inviteUseCount ?? 0,
+    }),
+    ...serializeRouteShare({
+      routeShareCode:
+        (trip as { routeShareCode?: string | null }).routeShareCode ?? null,
+      routeShareEnabled:
+        (trip as { routeShareEnabled?: boolean }).routeShareEnabled ?? false,
+      routeShareExpiresAt:
+        (trip as { routeShareExpiresAt?: Date | null }).routeShareExpiresAt ??
+        null,
+      routeShareMaxUses:
+        (trip as { routeShareMaxUses?: number | null }).routeShareMaxUses ??
+        null,
+      routeShareUseCount:
+        (trip as { routeShareUseCount?: number }).routeShareUseCount ?? 0,
     }),
     aiInsights: parseAiInsights(
       (trip as { aiInsights?: string }).aiInsights

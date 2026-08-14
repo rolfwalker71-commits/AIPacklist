@@ -2,6 +2,8 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { CreateTripClient } from "@/components/wizard/create-trip-client";
 import { ChecklistMotif } from "@/components/app/travel-motif";
+import { StartFromRouteForm } from "@/components/app/start-from-route-form";
+import { StartFromRouteFromQuery } from "@/components/app/start-from-route-from-query";
 import { Button } from "@/components/ui/button";
 
 export default function CreatePage() {
@@ -18,12 +20,13 @@ export default function CreatePage() {
               Neue Reise
             </h1>
             <p className="mt-1 text-base text-stone-600">
-              Assistent, KI-Freitext oder Vorlage — gleiche Mengenlogik.
+              Assistent, KI-Freitext, Vorlage — oder eine geteilte Route
+              übernehmen.
             </p>
             <div className="mt-3 flex flex-wrap gap-2">
               <Link href="/join">
                 <Button variant="outline" size="sm">
-                  Beitreten
+                  Reise beitreten
                 </Button>
               </Link>
               <Link href="/settings">
@@ -35,6 +38,13 @@ export default function CreatePage() {
           </div>
         </div>
       </div>
+
+      <div className="mb-6">
+        <Suspense fallback={<StartFromRouteForm />}>
+          <StartFromRouteFromQuery />
+        </Suspense>
+      </div>
+
       <Suspense>
         <CreateTripClient />
       </Suspense>

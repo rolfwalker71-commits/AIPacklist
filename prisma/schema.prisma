@@ -72,6 +72,12 @@ model Trip {
   inviteExpiresAt DateTime?
   inviteMaxUses   Int?
   inviteUseCount  Int       @default(0)
+  /// Share itinerary only (no pack list) with another group
+  routeShareCode      String?   @unique
+  routeShareEnabled   Boolean   @default(false)
+  routeShareExpiresAt DateTime?
+  routeShareMaxUses   Int?
+  routeShareUseCount  Int       @default(0)
   aiInsights      String    @default("{}")
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt

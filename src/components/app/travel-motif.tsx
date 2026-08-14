@@ -105,3 +105,62 @@ export function ChecklistMotif({ className = "" }: { className?: string }) {
     </svg>
   );
 }
+
+/** Sparkles + guide card for Tipps / AI insights */
+export function TipsMotif({ className = "" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 140 100" className={className} aria-hidden fill="none">
+      <rect x="28" y="22" width="70" height="58" rx="10" fill="#FFF" opacity="0.92" />
+      <rect x="40" y="34" width="34" height="5" rx="2" fill="#0F766E" opacity="0.75" />
+      <rect x="40" y="46" width="46" height="4" rx="2" fill="#D6D3D1" />
+      <rect x="40" y="56" width="40" height="4" rx="2" fill="#E7E5E4" />
+      <rect x="40" y="66" width="28" height="4" rx="2" fill="#E7E5E4" />
+      <path
+        d="M98 28 L102 38 L112 42 L102 46 L98 56 L94 46 L84 42 L94 38 Z"
+        fill="#FBBF24"
+        opacity="0.95"
+      />
+      <path
+        d="M118 52 L120 58 L126 60 L120 62 L118 68 L116 62 L110 60 L116 58 Z"
+        fill="#CCFBF1"
+        opacity="0.9"
+      />
+      <circle cx="24" cy="48" r="5" fill="#B45309" opacity="0.75" />
+    </svg>
+  );
+}
+
+/** People / avatars for Team tab */
+export function TeamMotif({ className = "" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 140 100" className={className} aria-hidden fill="none">
+      <path
+        d="M18 78 C36 52, 58 46, 88 58 S 122 78, 128 64"
+        stroke="#0F766E"
+        strokeWidth="2.5"
+        strokeLinecap="round"
+        strokeDasharray="4 6"
+        opacity="0.35"
+      />
+      <circle cx="42" cy="38" r="14" fill="#0F766E" />
+      <path
+        d="M22 78 C22 62, 62 62, 62 78"
+        fill="#0F766E"
+        opacity="0.9"
+      />
+      <circle cx="78" cy="42" r="12" fill="#B45309" />
+      <path
+        d="M60 80 C60 66, 96 66, 96 80"
+        fill="#B45309"
+        opacity="0.9"
+      />
+      <circle cx="108" cy="48" r="10" fill="#1D4ED8" opacity="0.85" />
+      <path
+        d="M94 82 C94 70, 122 70, 122 82"
+        fill="#1D4ED8"
+        opacity="0.8"
+      />
+      <circle cx="118" cy="28" r="7" fill="#FBBF24" opacity="0.85" />
+    </svg>
+  );
+}

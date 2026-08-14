@@ -42,6 +42,9 @@ export interface CalculatedItem {
   source: "calculator" | "template" | "manual" | "ai";
   /** Traveler key for personal items; undefined/shared for shared */
   assigneeKey?: string;
+  /** Optional suitcase hint from AI (id resolved later) */
+  preferredSuitcaseId?: string;
+  suggestedBag?: string | null;
 }
 
 export interface TripDraft {

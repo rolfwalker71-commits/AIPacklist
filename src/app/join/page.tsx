@@ -71,7 +71,8 @@ export default function JoinPage() {
         Reise beitreten
       </h1>
       <p className="mt-2 text-base text-stone-600">
-        Code von der Trip-Besitzer:in — danach unter «Reisen».
+        Pack-Einladung von der Trip-Besitzer:in — gemeinsame Packliste. Danach
+        unter «Reisen».
       </p>
       <TravelMotif className="mt-4 h-28 w-full max-w-xs opacity-80" />
       <div className="mt-4">
@@ -79,6 +80,12 @@ export default function JoinPage() {
           <JoinForm />
         </Suspense>
       </div>
+      <p className="mt-6 text-sm text-stone-600">
+        Nur die Route (Etappen) übernehmen und selbst packen?{" "}
+        <Link href="/create" className="font-semibold text-teal-800">
+          Aus Route starten
+        </Link>
+      </p>
     </main>
   );
 }

@@ -18,10 +18,16 @@ export function defaultInviteExpiry(from = new Date()): Date {
 
 export async function allocateInviteCode(): Promise<string> {
   let inviteCode = generateInviteCode();
-  while (await prisma.trip.findUnique({ where: { inviteCode } })) {
+  for (;;) {
+    const clash = await prisma.trip.findFirst({
+      where: {
+        OR: [{ inviteCode }, { routeShareCode: inviteCode }],
+      },
+      select: { id: true },
+    });
+    if (!clash) return inviteCode;
     inviteCode = generateInviteCode();
   }
-  return inviteCode;
 }
 
 export function inviteStatus(trip: InviteTripFields): {

@@ -17,9 +17,11 @@ type AiPackResponse = {
     notes?: string;
     forTraveler?: string | null;
     priority?: string;
+    suggestedBag?: string | null;
   }[];
   tips?: string[];
   guides?: { title?: string; body?: string }[];
+  capacityNote?: string | null;
 };
 
 function mapGuides(
@@ -113,6 +115,7 @@ function mapAiItems(
           source: "ai",
           assigneeKey: t.key,
           priority: itemPriority(name, category, notes, i.priority),
+          suggestedBag: i.suggestedBag ? String(i.suggestedBag) : null,
         });
       }
       continue;
@@ -139,6 +142,7 @@ function mapAiItems(
         ? "shared"
         : traveler?.key || travelers[0]?.key || "traveler-1",
       priority: itemPriority(name, category, notes, i.priority),
+      suggestedBag: i.suggestedBag ? String(i.suggestedBag) : null,
     });
   }
 
@@ -249,30 +253,58 @@ export async function enrichPackListWithAi(args: {
   legs: LegInput[];
   travelers: TravelerProfile[];
   existing: CalculatedItem[];
+  suitcases?: {
+    id: string;
+    name: string;
+    size: string;
+    isShared: boolean;
+    ownerUserId: string | null;
+    ownerName?: string | null;
+    softMaxItems: number;
+    currentItems: number;
+  }[];
 }): Promise<{
   items: CalculatedItem[];
   tips: string[];
   guides: { title: string; body: string }[];
   source: "openai" | "none";
+  capacityNote: string | null;
 }> {
   if (!isAiConfigured()) {
-    return { items: [], tips: [], guides: [], source: "none" };
+    return {
+      items: [],
+      tips: [],
+      guides: [],
+      source: "none",
+      capacityNote: null,
+    };
   }
 
   try {
+    const bags = args.suitcases || [];
     const ai = await aiJsonCompletion<AiPackResponse>({
       system: `Du ergänzt eine FlexiPack-Packliste und lieferst ausführliche Reiseinfos.
 Nur fehlende Items. Für JEDE Person in travelers prüfen, ob persönliche Basics und zielbezogene Formalitäten fehlen — auch für später hinzugekommene Personen/Kinder.
 Persönlich vs gemeinsam wie üblich. ${DESTINATION_RESEARCH}
+
+Koffer-Kapazität (wichtig):
+- suitcases listen Name, Grösse, Soft-Max-Positionen und aktuelle Belegung.
+- Ordne jedes neue Item einem existierenden Koffer zu (suggestedBag = exakter Koffer-Name).
+- Persönliche Items → persönlicher Koffer der Person; Gemeinsames → gemeinsamer Koffer.
+- Wenn Soft-Limits knapp/überschritten wären: capacityNote auf Deutsch formulieren (z.B. zusätzlicher Koffer / grössere Grösse / umpacken). Sonst capacityNote=null.
+
 tips: 10–15 kurze Tipps (Einreise, Vorschriften, Do's/Don'ts).
 guides: 5–8 längere Abschnitte inkl. Einreisebestimmungen und lokale Gegebenheiten.
-Schweizer Hochdeutsch. JSON: {"items":[...],"tips":[...],"guides":[{"title","body"}]}. Max 20 Items.`,
+Schweizer Hochdeutsch.
+JSON: {"items":[{"name","category","quantity","isShared","notes","forTraveler","priority","suggestedBag"}],"tips":[...],"guides":[{"title","body"}],"capacityNote":string|null}.
+Max 20 Items.`,
       user: JSON.stringify({
         legs: args.legs,
         travelers: args.travelers.map((t) => ({
           name: t.name,
           gender: t.gender,
         })),
+        suitcases: bags,
         existing: args.existing.map((i) => ({
           name: i.name,
           category: i.category,
@@ -287,18 +319,34 @@ Schweizer Hochdeutsch. JSON: {"items":[...],"tips":[...],"guides":[{"title","bod
     const existingNames = new Set(
       args.existing.map((i) => i.name.toLowerCase())
     );
-    const items = mapAiItems(ai.items || [], args.travelers).filter(
-      (i) => !existingNames.has(i.name.toLowerCase())
+    const bagByName = new Map(
+      bags.map((b) => [b.name.toLowerCase(), b.id] as const)
     );
+    const items = mapAiItems(ai.items || [], args.travelers)
+      .filter((i) => !existingNames.has(i.name.toLowerCase()))
+      .map((i) => {
+        const hint = i.suggestedBag?.trim();
+        const preferredSuitcaseId = hint
+          ? bagByName.get(hint.toLowerCase()) || null
+          : null;
+        return { ...i, preferredSuitcaseId: preferredSuitcaseId || undefined };
+      });
 
     return {
       items: items.slice(0, 20),
       tips: (ai.tips || []).slice(0, 18).map(String),
       guides: mapGuides(ai.guides),
       source: "openai",
+      capacityNote: ai.capacityNote ? String(ai.capacityNote).slice(0, 400) : null,
     };
   } catch {
-    return { items: [], tips: [], guides: [], source: "none" };
+    return {
+      items: [],
+      tips: [],
+      guides: [],
+      source: "none",
+      capacityNote: null,
+    };
   }
 }
 
