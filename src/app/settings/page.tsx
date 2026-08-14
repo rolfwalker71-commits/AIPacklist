@@ -90,18 +90,23 @@ export default function SettingsPage() {
 
   return (
     <main className="mx-auto max-w-2xl px-4 pb-20 pt-8">
-      <Link href="/" className="text-sm font-semibold text-teal-800">
-        ← FlexiPack
+      <Link href="/profil" className="text-base font-semibold text-teal-800">
+        ← Profil
       </Link>
-      <h1 className="mt-4 font-display text-3xl text-stone-950">
-        KI-Einstellungen
-      </h1>
-      <p className="mt-2 text-stone-600">
-        OpenAI steuert Freitext-Erkennung, Packlisten-Verfeinerung und Tipps.
-        Ohne Schlüssel fällt FlexiPack auf den Regelparser zurück.
-      </p>
+      <div className="mt-4 flex items-start gap-3">
+        <Sparkles className="mt-1 h-8 w-8 shrink-0 text-teal-800" />
+        <div>
+          <h1 className="font-display text-page-title text-stone-950">
+            KI-Einstellungen
+          </h1>
+          <p className="mt-2 text-base text-stone-600">
+            OpenAI steuert Freitext-Erkennung, Packlisten-Verfeinerung und Tipps.
+            Ohne Schlüssel fällt FlexiPack auf den Regelparser zurück.
+          </p>
+        </div>
+      </div>
 
-      <div className="mt-8 space-y-6 rounded-2xl border border-stone-200 bg-white/80 p-5">
+      <div className="card-surface mt-8 space-y-6 p-5">
         <div className="flex items-start gap-3">
           {status?.configured ? (
             <CheckCircle2 className="mt-0.5 h-5 w-5 text-teal-700" />

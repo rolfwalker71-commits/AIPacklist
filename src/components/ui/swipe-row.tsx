@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
 export type SwipeAction = {
@@ -10,18 +10,19 @@ export type SwipeAction = {
   tone?: "danger" | "neutral";
 };
 
-function isInteractiveTarget(target: EventTarget | null) {
+/** Native controls that must keep their own gesture; buttons/links stay swipeable. */
+function shouldSkipSwipe(target: EventTarget | null) {
   if (!(target instanceof Element)) return false;
-  return Boolean(
-    target.closest(
-      "button, a, input, select, textarea, label, [role='button'], [data-no-swipe]"
-    )
-  );
+  return Boolean(target.closest("select, input, textarea, [data-no-swipe]"));
 }
 
+type DragMode = "none" | "h" | "v" | "skip";
+
 /**
- * Swipe left to reveal actions. Works with touch and mouse drag.
- * Clicks on buttons/selects are never captured so packing toggles keep working.
+ * Swipe left to reveal actions (touch + mouse).
+ * Uses window-level pointer listeners so a mouse drag always ends on
+ * pointerup/cancel — even if the cursor left the tile — avoiding stuck
+ * capture and “ghost” swipes on other cards.
  */
 export function SwipeRow({
   children,
@@ -33,60 +34,137 @@ export function SwipeRow({
   className?: string;
 }) {
   const [offset, setOffset] = useState(0);
-  const startX = useRef(0);
-  const startY = useRef(0);
-  const startOffset = useRef(0);
-  const mode = useRef<"none" | "h" | "v" | "skip">("none");
-  const panelRef = useRef<HTMLDivElement | null>(null);
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const suppressClick = useRef(false);
   const maxReveal = Math.min(72 * actions.length, 180);
   const open = offset < -4;
 
-  const endDrag = (e?: React.PointerEvent) => {
-    if (mode.current === "h") {
-      setOffset((o) => (o < -maxReveal / 2 ? -maxReveal : 0));
-    }
-    if (
-      e &&
-      panelRef.current?.hasPointerCapture(e.pointerId)
-    ) {
-      panelRef.current.releasePointerCapture(e.pointerId);
-    }
-    mode.current = "none";
+  const drag = useRef({
+    offset: 0,
+    startX: 0,
+    startY: 0,
+    startOffset: 0,
+    mode: "none" as DragMode,
+    pointerId: null as number | null,
+    maxReveal,
+  });
+  drag.current.offset = offset;
+  drag.current.maxReveal = maxReveal;
+
+  const moveHandler = useRef<(e: PointerEvent) => void>(() => undefined);
+  const upHandler = useRef<(e: PointerEvent) => void>(() => undefined);
+
+  // Stable identities for addEventListener / removeEventListener
+  const listeners = useRef({
+    move(e: PointerEvent) {
+      moveHandler.current(e);
+    },
+    up(e: PointerEvent) {
+      upHandler.current(e);
+    },
+  }).current;
+
+  const detach = () => {
+    window.removeEventListener("pointermove", listeners.move);
+    window.removeEventListener("pointerup", listeners.up);
+    window.removeEventListener("pointercancel", listeners.up);
   };
 
-  const onPointerDown = (e: React.PointerEvent) => {
-    if (isInteractiveTarget(e.target)) {
-      mode.current = "skip";
-      return;
-    }
-    mode.current = "none";
-    startX.current = e.clientX;
-    startY.current = e.clientY;
-    startOffset.current = offset;
-  };
+  moveHandler.current = (e: PointerEvent) => {
+    const d = drag.current;
+    if (e.pointerId !== d.pointerId) return;
+    if (d.mode === "skip" || d.mode === "v") return;
 
-  const onPointerMove = (e: React.PointerEvent) => {
-    if (mode.current === "skip") return;
-    const dx = e.clientX - startX.current;
-    const dy = e.clientY - startY.current;
-    if (mode.current === "none") {
+    const dx = e.clientX - d.startX;
+    const dy = e.clientY - d.startY;
+
+    if (d.mode === "none") {
       if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
-      if (Math.abs(dx) > Math.abs(dy)) {
-        mode.current = "h";
-        panelRef.current?.setPointerCapture(e.pointerId);
-      } else {
-        mode.current = "v";
+      if (Math.abs(dx) <= Math.abs(dy)) {
+        d.mode = "v";
+        d.pointerId = null;
+        detach();
         return;
       }
+      d.mode = "h";
+      suppressClick.current = true;
+      if (
+        document.activeElement instanceof HTMLElement &&
+        rootRef.current?.contains(document.activeElement)
+      ) {
+        document.activeElement.blur();
+      }
     }
-    if (mode.current !== "h") return;
+
+    if (d.mode !== "h") return;
     e.preventDefault();
-    const next = Math.min(0, Math.max(-maxReveal, startOffset.current + dx));
-    setOffset(next);
+    setOffset(Math.min(0, Math.max(-d.maxReveal, d.startOffset + dx)));
+  };
+
+  upHandler.current = (e: PointerEvent) => {
+    const d = drag.current;
+    if (e.pointerId !== d.pointerId) return;
+    if (d.mode === "h") {
+      setOffset((o) => (o < -d.maxReveal / 2 ? -d.maxReveal : 0));
+    }
+    d.mode = "none";
+    d.pointerId = null;
+    detach();
+  };
+
+  useEffect(() => {
+    return () => {
+      drag.current.pointerId = null;
+      drag.current.mode = "none";
+      detach();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- detach uses stable listeners
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: PointerEvent) => {
+      if (rootRef.current?.contains(e.target as Node)) return;
+      setOffset(0);
+    };
+    document.addEventListener("pointerdown", onDown, true);
+    return () => document.removeEventListener("pointerdown", onDown, true);
+  }, [open]);
+
+  const onPointerDown = (e: React.PointerEvent) => {
+    if (e.pointerType === "mouse" && e.button !== 0) return;
+    if (shouldSkipSwipe(e.target)) {
+      drag.current.mode = "skip";
+      return;
+    }
+
+    detach();
+
+    suppressClick.current = false;
+    const d = drag.current;
+    d.mode = "none";
+    d.pointerId = e.pointerId;
+    d.startX = e.clientX;
+    d.startY = e.clientY;
+    d.startOffset = d.offset;
+
+    window.addEventListener("pointermove", listeners.move, { passive: false });
+    window.addEventListener("pointerup", listeners.up);
+    window.addEventListener("pointercancel", listeners.up);
+  };
+
+  const onClickCapture = (e: React.MouseEvent) => {
+    if (!suppressClick.current) return;
+    e.preventDefault();
+    e.stopPropagation();
+    suppressClick.current = false;
   };
 
   return (
-    <div className={cn("relative overflow-hidden rounded-xl", className)}>
+    <div
+      ref={rootRef}
+      className={cn("relative overflow-hidden rounded-xl", className)}
+    >
       <div
         className={cn(
           "absolute inset-y-0 right-0 flex transition-opacity duration-150",
@@ -113,13 +191,10 @@ export function SwipeRow({
         ))}
       </div>
       <div
-        ref={panelRef}
         className="relative z-10 w-full touch-pan-y bg-transparent transition-transform duration-150 ease-out"
         style={{ transform: `translateX(${offset}px)` }}
         onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={endDrag}
-        onPointerCancel={endDrag}
+        onClickCapture={onClickCapture}
       >
         {children}
       </div>

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { publish } from "@/lib/events";
 import { inferPriority, normalizePriority } from "@/lib/priority";
+import { suggestCategory } from "@/lib/categorize";
 import { authErrorResponse, requireSessionUser } from "@/lib/auth";
 import { userCanAccessTrip } from "@/lib/trip-access";
 
@@ -88,9 +89,64 @@ export async function POST(
     }
 
     const body = await req.json();
-    const name = String(body.name || "").slice(0, 80);
-    const category = String(body.category || "Sonstiges").slice(0, 40);
-    const notes = body.notes ? String(body.notes) : null;
+    const name = String(body.name || "").trim().slice(0, 80);
+    if (!name) {
+      return NextResponse.json({ error: "Name nötig" }, { status: 400 });
+    }
+
+    const extraNotes = body.notes ? String(body.notes).trim().slice(0, 200) : "";
+    const quantity = Math.max(1, Math.min(99, Number(body.quantity) || 1));
+
+    const trip = await prisma.trip.findUnique({
+      where: { id: tripId },
+      include: { members: { include: { user: true } } },
+    });
+    if (!trip) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
+
+    const assigneeUserId =
+      typeof body.assigneeUserId === "string" && body.assigneeUserId
+        ? body.assigneeUserId
+        : null;
+
+    let shared = false;
+    let assigneeName: string | null = null;
+
+    if (body.assignee === "shared" || body.isShared === true) {
+      shared = true;
+    } else if (assigneeUserId) {
+      const member = trip.members.find((m) => m.userId === assigneeUserId);
+      if (!member) {
+        return NextResponse.json(
+          { error: "Zuweisung ungültig" },
+          { status: 400 }
+        );
+      }
+      assigneeName = member.user.name;
+    } else if (trip.members.length === 1) {
+      assigneeName = trip.members[0].user.name;
+    } else {
+      assigneeName =
+        trip.members.find((m) => m.userId === sessionUser.id)?.user.name ||
+        sessionUser.name;
+    }
+
+    const noteParts = [
+      assigneeName && !shared ? `für ${assigneeName}` : null,
+      extraNotes || null,
+    ].filter(Boolean);
+    const notes = noteParts.length ? noteParts.join(" · ") : null;
+
+    const categoryRaw =
+      typeof body.category === "string" ? body.category.trim() : "";
+    const category =
+      !categoryRaw ||
+      categoryRaw === "auto" ||
+      body.categoryMode === "auto"
+        ? suggestCategory(name, notes)
+        : categoryRaw.slice(0, 40);
+
     const fromBody = normalizePriority(body.priority);
     const priority =
       body.priority != null && fromBody !== "NORMAL"
@@ -102,10 +158,10 @@ export async function POST(
         tripId,
         name,
         category,
-        quantity: body.quantity || 1,
-        isShared: Boolean(body.isShared),
+        quantity,
+        isShared: shared,
         priority,
-        suitcaseId: body.suitcaseId || null,
+        suitcaseId: null,
         notes,
         source: "manual",
       },
@@ -119,7 +175,10 @@ export async function POST(
       payload: { ...item, packedAt: null, created: true },
     });
 
-    return NextResponse.json(item);
+    return NextResponse.json({
+      ...item,
+      packedAt: null,
+    });
   } catch (e) {
     const { error, status } = authErrorResponse(e);
     return NextResponse.json({ error }, { status });

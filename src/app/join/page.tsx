@@ -40,7 +40,7 @@ function JoinForm() {
   };
 
   return (
-    <div className="mx-auto max-w-md space-y-4 rounded-2xl border border-stone-200 bg-white/80 p-6">
+    <div className="card-surface mx-auto max-w-md space-y-4 p-6">
       <div>
         <Label>Einladungscode</Label>
         <Input
@@ -49,11 +49,11 @@ function JoinForm() {
           placeholder="ABC123"
         />
       </div>
-      <p className="text-xs text-stone-500">
+      <p className="text-sm text-stone-500">
         Du trittst mit deinem angemeldeten Konto bei. Partner:innen brauchen
         ebenfalls ein vom Admin angelegtes Benutzerkonto.
       </p>
-      {error && <p className="text-sm text-rose-700">{error}</p>}
+      {error && <p className="text-base text-rose-700">{error}</p>}
       <Button className="w-full" disabled={busy || !code} onClick={join}>
         Beitreten
       </Button>
@@ -64,18 +64,18 @@ function JoinForm() {
 export default function JoinPage() {
   return (
     <main className="mx-auto max-w-lg px-4 pb-8 pt-6 md:max-w-3xl">
-      <Link href="/" className="text-sm font-semibold text-teal-800">
+      <Link href="/" className="text-base font-semibold text-teal-800">
         ← Reisen
       </Link>
-      <h1 className="mt-4 font-display text-3xl text-stone-950">
+      <h1 className="mt-4 font-display text-page-title text-stone-950">
         Reise beitreten
       </h1>
-      <p className="mt-2 text-sm text-stone-600">
+      <p className="mt-2 text-base text-stone-600">
         Code von der Trip-Besitzer:in — danach unter «Reisen».
       </p>
-      <TravelMotif className="mt-4 h-24 w-full max-w-xs opacity-80" />
+      <TravelMotif className="mt-4 h-28 w-full max-w-xs opacity-80" />
       <div className="mt-4">
-        <Suspense fallback={<p className="text-sm text-stone-500">Laden…</p>}>
+        <Suspense fallback={<p className="text-base text-stone-500">Laden…</p>}>
           <JoinForm />
         </Suspense>
       </div>
