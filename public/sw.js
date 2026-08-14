@@ -1,4 +1,4 @@
-const CACHE = "flexipack-v5";
+const CACHE = "flexipack-v6";
 const PRECACHE = [
   "/",
   "/manifest.webmanifest",

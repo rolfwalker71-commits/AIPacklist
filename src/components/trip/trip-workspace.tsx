@@ -49,6 +49,17 @@ import {
   type PackPriority,
 } from "@/lib/priority";
 import { findDuplicateGroups, type CleanupItem } from "@/lib/pack-cleanup";
+import {
+  applyOutboxToItems,
+  enqueuePackToggle,
+  flushPackOutbox,
+  isBrowserOnline,
+  listOutbox,
+  loadTripSnapshot,
+  pendingCount,
+  removeOutboxEntry,
+  saveTripSnapshot,
+} from "@/lib/offline-pack";
 
 type SessionUserProp = {
   id: string;
@@ -386,8 +397,11 @@ export function TripWorkspace({
   const [weatherBusy, setWeatherBusy] = useState(false);
   const [cleanupBusy, setCleanupBusy] = useState(false);
   const [photoBusyId, setPhotoBusyId] = useState<string | null>(null);
+  const [isOnline, setIsOnline] = useState(true);
+  const [pendingSync, setPendingSync] = useState(0);
   const photoInputRef = useRef<HTMLInputElement>(null);
   const photoTargetId = useRef<string | null>(null);
+  const flushingRef = useRef(false);
 
   useEffect(() => {
     setUser(sessionUser);
@@ -399,6 +413,79 @@ export function TripWorkspace({
     setOpenSections(loadOpenSections(trip.id));
     setActiveTab(loadTab(trip.id));
   }, [trip.id]);
+
+  const refreshPending = useCallback(async (tripId: string) => {
+    const n = await pendingCount(tripId);
+    setPendingSync(n);
+  }, []);
+
+  const flushAndRefresh = useCallback(async (tripId: string) => {
+    if (flushingRef.current || !isBrowserOnline()) return;
+    flushingRef.current = true;
+    try {
+      await flushPackOutbox(tripId);
+      await refreshPending(tripId);
+      if (!isBrowserOnline()) return;
+      const res = await fetch(`/api/trips/${tripId}`, {
+        credentials: "same-origin",
+      });
+      if (res.ok) {
+        const data = (await res.json()) as Trip;
+        setTrip({
+          ...data,
+          aiInsights: normalizeInsights(data.aiInsights),
+        });
+      }
+    } finally {
+      flushingRef.current = false;
+      await refreshPending(tripId);
+    }
+  }, [refreshPending]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const boot = async () => {
+      const online = isBrowserOnline();
+      if (!cancelled) setIsOnline(online);
+
+      if (!online) {
+        const snap = await loadTripSnapshot<Trip>(trip.id);
+        if (cancelled || !snap) {
+          await refreshPending(trip.id);
+          return;
+        }
+        const outbox = await listOutbox(trip.id);
+        setTrip({
+          ...snap,
+          items: applyOutboxToItems(snap.items || [], outbox),
+          aiInsights: normalizeInsights(snap.aiInsights),
+        });
+      } else {
+        await flushAndRefresh(trip.id);
+      }
+      if (!cancelled) await refreshPending(trip.id);
+    };
+
+    void boot();
+
+    const onOnline = () => {
+      setIsOnline(true);
+      void flushAndRefresh(trip.id);
+    };
+    const onOffline = () => setIsOnline(false);
+    window.addEventListener("online", onOnline);
+    window.addEventListener("offline", onOffline);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("online", onOnline);
+      window.removeEventListener("offline", onOffline);
+    };
+  }, [trip.id, flushAndRefresh, refreshPending]);
+
+  useEffect(() => {
+    void saveTripSnapshot(trip.id, trip);
+  }, [trip]);
 
   useEffect(() => {
     if (!pendingAvatar) {
@@ -604,9 +691,6 @@ export function TripWorkspace({
     async (item: PackItem) => {
       if (!user?.id) return;
       const packed = !item.packedAt;
-      const prevPackedAt = item.packedAt;
-      const prevPackedBy = item.packedBy;
-      const prevPackedByUserId = item.packedByUserId;
 
       setTrip((prev) => ({
         ...prev,
@@ -629,6 +713,24 @@ export function TripWorkspace({
         ),
       }));
 
+      const queueOffline = async () => {
+        try {
+          await enqueuePackToggle({
+            tripId: trip.id,
+            itemId: item.id,
+            packed,
+          });
+          await refreshPending(trip.id);
+        } catch {
+          // keep optimistic UI even if outbox write fails
+        }
+      };
+
+      if (!isBrowserOnline()) {
+        await queueOffline();
+        return;
+      }
+
       try {
         const res = await fetch(`/api/trips/${trip.id}/items`, {
           method: "PATCH",
@@ -640,6 +742,8 @@ export function TripWorkspace({
           }),
         });
         if (!res.ok) throw new Error("toggle failed");
+        await removeOutboxEntry(`${trip.id}:${item.id}`);
+        await refreshPending(trip.id);
         const data = await res.json().catch(() => null);
         if (data && typeof data.packedAt !== "undefined") {
           setTrip((prev) => ({
@@ -657,22 +761,10 @@ export function TripWorkspace({
           }));
         }
       } catch {
-        setTrip((prev) => ({
-          ...prev,
-          items: prev.items.map((i) =>
-            i.id === item.id
-              ? {
-                  ...i,
-                  packedAt: prevPackedAt,
-                  packedBy: prevPackedBy,
-                  packedByUserId: prevPackedByUserId,
-                }
-              : i
-          ),
-        }));
+        await queueOffline();
       }
     },
-    [trip.id, user]
+    [trip.id, user, refreshPending]
   );
 
   const moveSuitcase = async (itemId: string, suitcaseId: string) => {
@@ -1731,6 +1823,24 @@ export function TripWorkspace({
           </div>
 
           <PackProgressCard trip={trip} />
+
+          {(!isOnline || pendingSync > 0) && (
+            <div
+              className={cn(
+                "rounded-xl border px-3 py-2.5 text-sm",
+                !isOnline
+                  ? "border-amber-200 bg-amber-50 text-amber-950"
+                  : "border-teal-100 bg-teal-50 text-teal-950"
+              )}
+              role="status"
+            >
+              {!isOnline
+                ? "Offline — Änderungen werden später synchronisiert"
+                : pendingSync === 1
+                  ? "1 Änderung wird synchronisiert…"
+                  : `${pendingSync} Änderungen werden synchronisiert…`}
+            </div>
+          )}
 
           <input
             ref={photoInputRef}
