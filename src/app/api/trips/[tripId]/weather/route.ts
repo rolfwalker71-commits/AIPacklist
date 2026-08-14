@@ -89,12 +89,18 @@ export async function POST(
     publish({ type: "trip_updated", tripId });
 
     const okCount = results.filter((r) => r.ok).length;
+    const failHints = results
+      .filter((r) => !r.ok && r.error)
+      .map((r) => r.error)
+      .slice(0, 2);
     return NextResponse.json({
       ...serializeTrip(full),
       weatherResults: results,
       message:
         okCount === 0
-          ? "Wetter konnte nicht geladen werden."
+          ? failHints.length
+            ? `Wetter konnte nicht geladen werden (${failHints.join("; ")}). Tipp: konkreten Ort angeben, z.B. «Orlando» statt nur «Florida».`
+            : "Wetter konnte nicht geladen werden. Tipp: konkreten Ort angeben, z.B. «Orlando» statt nur «Florida»."
           : `${okCount} Etappe(n) aktualisiert. Packliste bei Bedarf neu berechnen.`,
     });
   } catch (e) {

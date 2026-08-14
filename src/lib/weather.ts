@@ -16,33 +16,187 @@ type GeoHit = {
   longitude: number;
   name: string;
   country?: string;
+  country_code?: string;
+  admin1?: string;
+  population?: number;
+  feature_code?: string;
 };
 
 const geoCache = new Map<string, GeoHit | null>();
 
-async function geocode(location: string): Promise<GeoHit | null> {
-  const key = location.trim().toLowerCase();
-  if (!key) return null;
-  if (geoCache.has(key)) return geoCache.get(key) ?? null;
+/**
+ * Open-Meteo has no reliable “US state Florida” hit — bare “Florida” ranks
+ * Floridablanca (CO) first, and “Florida USA” often returns nothing.
+ * Map travel presets / ambiguous regions to a concrete forecast point.
+ */
+const LOCATION_ALIASES: Record<string, string> = {
+  florida: "Orlando, Florida",
+  "florida usa": "Orlando, Florida",
+  "florida, usa": "Orlando, Florida",
+  "florida us": "Orlando, Florida",
+  "florida, us": "Orlando, Florida",
+  "florida united states": "Orlando, Florida",
+  "florida, united states": "Orlando, Florida",
+  "usa ostküste": "New York",
+  "usa ostkueste": "New York",
+  "usa westküste": "Los Angeles",
+  "usa westkueste": "Los Angeles",
+  karibik: "San Juan, Puerto Rico",
+  mittelmeer: "Barcelona",
+  skandinavien: "Stockholm",
+  europa: "Berlin",
+  asien: "Bangkok",
+  nahost: "Dubai",
+  nordafrika: "Marrakesch",
+  alpen: "Innsbruck",
+  transatlantik: "New York",
+};
 
+const COUNTRY_HINTS: { re: RegExp; code: string }[] = [
+  {
+    re: /\b(usa|u\.s\.a\.|u\.s\.|united states|vereinigte staaten)\b/i,
+    code: "US",
+  },
+  { re: /\b(uk|united kingdom|grossbritannien|großbritannien)\b/i, code: "GB" },
+  { re: /\b(deutschland|germany)\b/i, code: "DE" },
+  { re: /\b(schweiz|switzerland)\b/i, code: "CH" },
+  { re: /\b(österreich|oesterreich|austria)\b/i, code: "AT" },
+  { re: /\b(frankreich|france)\b/i, code: "FR" },
+  { re: /\b(italien|italy)\b/i, code: "IT" },
+  { re: /\b(spanien|spain)\b/i, code: "ES" },
+];
+
+function normalizeKey(location: string) {
+  return location
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "")
+    .replace(/\s+/g, " ");
+}
+
+function resolveAlias(location: string): string {
+  const key = normalizeKey(location);
+  return LOCATION_ALIASES[key] || location.trim();
+}
+
+function parseCountryHint(location: string): {
+  query: string;
+  countryCode: string | null;
+} {
+  let countryCode: string | null = null;
+  let query = location.trim();
+  for (const hint of COUNTRY_HINTS) {
+    if (hint.re.test(query)) {
+      countryCode = hint.code;
+      query = query.replace(hint.re, "").replace(/[,\s]+$/g, "").trim();
+      // "Florida, USA" → "Florida"; keep commas clean
+      query = query.replace(/,\s*$/, "").trim();
+      break;
+    }
+  }
+  return { query: query || location.trim(), countryCode };
+}
+
+function scoreHit(
+  hit: GeoHit,
+  query: string,
+  countryCode: string | null
+): number {
+  const q = query.trim().toLowerCase();
+  const name = (hit.name || "").toLowerCase();
+  const admin1 = (hit.admin1 || "").toLowerCase();
+  let score = Math.log10((hit.population || 0) + 10);
+
+  if (countryCode && hit.country_code === countryCode) score += 50;
+  else if (countryCode && hit.country_code && hit.country_code !== countryCode)
+    score -= 40;
+
+  if (name === q) score += 30;
+  else if (name.startsWith(q)) score += 12;
+  else if (name.includes(q)) score += 4;
+
+  // Prefer places that sit in a region matching the query (e.g. Miami in Florida)
+  if (admin1 === q) score += 25;
+
+  // Prefer cities over tiny populated places when names collide
+  const fc = hit.feature_code || "";
+  if (fc.startsWith("PPLA")) score += 8;
+  if (fc === "PPL" && (hit.population || 0) < 5000) score -= 5;
+
+  return score;
+}
+
+async function geocodeSearch(
+  name: string,
+  countryCode: string | null
+): Promise<GeoHit[]> {
   const url = new URL("https://geocoding-api.open-meteo.com/v1/search");
-  url.searchParams.set("name", location.trim());
-  url.searchParams.set("count", "1");
+  url.searchParams.set("name", name);
+  url.searchParams.set("count", "10");
   url.searchParams.set("language", "de");
   url.searchParams.set("format", "json");
+  if (countryCode) url.searchParams.set("countryCode", countryCode);
+
+  const res = await fetch(url.toString(), { next: { revalidate: 86400 } });
+  if (!res.ok) return [];
+  const data = (await res.json()) as { results?: GeoHit[] };
+  return data.results || [];
+}
+
+function buildSearchPlan(location: string): {
+  searchName: string;
+  countryCode: string | null;
+  scoreQuery: string;
+} {
+  const { query, countryCode } = parseCountryHint(location);
+
+  // Full string or stripped query → alias (Florida / Florida USA → Orlando)
+  for (const candidate of [location.trim(), query, countryCode === "US" ? `${query} USA` : ""]) {
+    if (!candidate) continue;
+    const alias = resolveAlias(candidate);
+    if (alias !== candidate.trim()) {
+      return {
+        searchName: alias,
+        countryCode,
+        scoreQuery: alias,
+      };
+    }
+  }
+
+  return { searchName: query, countryCode, scoreQuery: query };
+}
+
+async function geocode(location: string): Promise<GeoHit | null> {
+  const cacheKey = normalizeKey(location);
+  if (!cacheKey) return null;
+  if (geoCache.has(cacheKey)) return geoCache.get(cacheKey) ?? null;
 
   try {
-    const res = await fetch(url.toString(), { next: { revalidate: 86400 } });
-    if (!res.ok) {
-      geoCache.set(key, null);
+    const plan = buildSearchPlan(location);
+    let results = await geocodeSearch(plan.searchName, plan.countryCode);
+    if (!results.length && plan.countryCode) {
+      results = await geocodeSearch(plan.searchName, null);
+    }
+    if (!results.length && plan.searchName !== location.trim()) {
+      results = await geocodeSearch(location.trim(), plan.countryCode);
+    }
+
+    if (!results.length) {
+      geoCache.set(cacheKey, null);
       return null;
     }
-    const data = (await res.json()) as { results?: GeoHit[] };
-    const hit = data.results?.[0] ?? null;
-    geoCache.set(key, hit);
+
+    const ranked = [...results].sort(
+      (a, b) =>
+        scoreHit(b, plan.scoreQuery, plan.countryCode) -
+        scoreHit(a, plan.scoreQuery, plan.countryCode)
+    );
+    const hit = ranked[0] ?? null;
+    geoCache.set(cacheKey, hit);
     return hit;
   } catch {
-    geoCache.set(key, null);
+    geoCache.set(cacheKey, null);
     return null;
   }
 }
@@ -135,7 +289,10 @@ export async function fetchLegWeather(opts: {
   const url = new URL("https://api.open-meteo.com/v1/forecast");
   url.searchParams.set("latitude", String(geo.latitude));
   url.searchParams.set("longitude", String(geo.longitude));
-  url.searchParams.set("daily", "temperature_2m_max,temperature_2m_min,precipitation_sum");
+  url.searchParams.set(
+    "daily",
+    "temperature_2m_max,temperature_2m_min,precipitation_sum"
+  );
   url.searchParams.set("timezone", "auto");
   url.searchParams.set("start_date", toIsoDate(start));
   url.searchParams.set("end_date", toIsoDate(end));
@@ -167,7 +324,13 @@ export async function fetchLegWeather(opts: {
     ? rains.reduce((a, b) => a + b, 0) / rains.length
     : null;
 
-  const placeName = [geo.name, geo.country].filter(Boolean).join(", ");
+  const placeName = [
+    geo.name,
+    geo.admin1 && geo.admin1 !== geo.name ? geo.admin1 : null,
+    geo.country,
+  ]
+    .filter(Boolean)
+    .join(", ");
   const tags = tagsFromForecast({ tMin, tMax, rainMm });
   const summary: WeatherSummary = {
     label: buildLabel({ tMin, tMax, rainMm, placeName }),
