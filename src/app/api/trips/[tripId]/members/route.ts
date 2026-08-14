@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { serializeTrip, tripInclude } from "@/lib/trip-service";
+import { serializeTrip, tripInclude, ensureMemberPackKit } from "@/lib/trip-service";
 import { publish } from "@/lib/events";
 import { authErrorResponse, requireSessionUser } from "@/lib/auth";
 import { userCanAccessTrip } from "@/lib/trip-access";
@@ -64,6 +64,9 @@ export async function POST(
           ...(exhausted ? { inviteEnabled: false } : {}),
         },
       });
+
+      // Personal items/suitcase are only built at create time — fill gap for joiners
+      await ensureMemberPackKit(tripId, sessionUser.id);
 
       publish({
         type: "member_joined",

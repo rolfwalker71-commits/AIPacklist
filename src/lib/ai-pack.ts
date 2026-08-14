@@ -29,11 +29,20 @@ function mapGuides(
     .filter((g) => g && (g.title || g.body))
     .map((g) => ({
       title: String(g.title || "Reisetipp").slice(0, 120),
-      body: String(g.body || "").slice(0, 4000),
+      body: String(g.body || "").slice(0, 5000),
     }))
     .filter((g) => g.body.length > 20)
-    .slice(0, 8);
+    .slice(0, 10);
 }
+
+/** Shared research brief for destination-aware packing + tips. */
+const DESTINATION_RESEARCH = `Reiseziel-Recherche (sehr wichtig — location und Etappen-Namen ernst nehmen):
+- Einreise & Formalitäten für Personen mit CH/EU-Pass UND Hinweise falls abweichend: Visa/ESTA/ETA/eTA, Passgültigkeit (oft 6 Monate), Rück-/Weiterflugnachweis, Impfungen/Gesundheitszeugnisse, Zollfreimengen.
+- Lokale Vorschriften: Bargeld/Karten, Trinkgeld, Steckertyp, Notfallnummern, Notruf, Versicherungen.
+- Do's and Don'ts: Kleidung/Dresscodes, Fotografieren, Religion/Kultur, Alkohol/Drogen, Drohnen, öffentliche Verkehrsmittel, Sicherheit.
+- Klima & Gegebenheiten: Wetter je Etappe, Waschen, typische Aktivitäten, was man vor Ort günstig kauft vs. mitbringen sollte.
+- Kinder/weitere Personen: altersgerechte Items und Formalitäten mitdenken, wenn mehrere Reisende.
+Frühe Priorität (EARLY) für alles, was vor Abreise beantragt/geprüft werden muss.`;
 
 /** Hard safety net — never let these become "gemeinsam". */
 const ALWAYS_PERSONAL = [
@@ -177,15 +186,15 @@ export async function buildPackList(args: {
       system: `Du bist Packlisten- und Reise-Experte für FlexiPack (Schweiz). Erstelle eine vollständige Packliste PLUS ausführliche Reisetipps.
 
 Prinzipien Packliste:
-1) Persönlich (isShared=false, forTraveler=Name): Pass, Tickets, ESTA/Visa, Zahnbürste, Medikamente, Unterwäsche, Powerbank, Ladekabel, eigene Schuhe/Abendgarderobe.
+1) Für JEDE Person in travelers persönliche Items (isShared=false, forTraveler=exakter Name): Pass, Tickets, Einreiseformulare, Zahnbürste, Medikamente, Unterwäsche, Powerbank, Ladekabel, eigene Schuhe/Abendgarderobe. Auch Kind/3. Person vollständig bedenken.
 2) Gemeinsam (isShared=true): nur wirklich Teilbares (Zahnpasta, Duschgel, Sonnencreme, Schirm, Erste Hilfe).
-3) Priorität: EARLY (Formulare/Visa/Impfung), DAY_OF (Bordkarte/Schlüssel), NORMAL sonst.
-4) location der Etappen (Florida, Karibik, Transatlantik, Europa …) stark berücksichtigen: Klima, Formalitäten, typische Aktivitäten.
+3) Priorität: EARLY (Formulare/Visa/Impfung/Einreise), DAY_OF (Bordkarte/Schlüssel), NORMAL sonst.
+4) ${DESTINATION_RESEARCH}
 5) Schweizer Hochdeutsch (ss statt ß).
 
 Zusätzlich:
-- tips: 8–15 kurze, konkrete Bullet-Tipps
-- guides: 3–6 längere Abschnitte (je 2–5 Sätze) zu Etappen/Regionen, z.B. ESTA/USA, Karibik-Inselhopping, Waschen an Bord, Gala, Wetter Transatlantik.
+- tips: 10–18 kurze, konkrete Bullet-Tipps (mind. 4 zu Einreise/Vorschriften/Do's-Don'ts).
+- guides: 5–8 längere Abschnitte (je 3–7 Sätze), davon mind. je einer zu: Einreisebestimmungen, lokale Vorschriften, Do's and Don'ts, Klima/Alltag vor Ort.
 
 JSON:
 {
@@ -193,7 +202,7 @@ JSON:
   "tips": string[],
   "guides": [{ "title": string, "body": string }]
 }
-Ziel: 25–55 Items.`,
+Ziel: 30–70 Items (steigt mit Anzahl Reisender).`,
       user: JSON.stringify({
         legs: args.legs,
         travelers: travelers.map((t) => ({
@@ -206,7 +215,7 @@ Ziel: 25–55 Items.`,
     });
 
     const items = mapAiItems(ai.items || [], travelers);
-    const tips = (ai.tips || []).slice(0, 15).map(String);
+    const tips = (ai.tips || []).slice(0, 18).map(String);
     const guides = mapGuides(ai.guides);
     if (items.length < 8) {
       return {
@@ -253,9 +262,11 @@ export async function enrichPackListWithAi(args: {
   try {
     const ai = await aiJsonCompletion<AiPackResponse>({
       system: `Du ergänzt eine FlexiPack-Packliste und lieferst ausführliche Reiseinfos.
-Nur fehlende Items. Persönlich vs gemeinsam wie üblich. location der Etappen nutzen.
-tips: 8–12 kurze Tipps. guides: 3–6 längere Regional-/Etappen-Tipps (2–5 Sätze).
-Schweizer Hochdeutsch. JSON: {"items":[...],"tips":[...],"guides":[{"title","body"}]}. Max 12 Items.`,
+Nur fehlende Items. Für JEDE Person in travelers prüfen, ob persönliche Basics und zielbezogene Formalitäten fehlen — auch für später hinzugekommene Personen/Kinder.
+Persönlich vs gemeinsam wie üblich. ${DESTINATION_RESEARCH}
+tips: 10–15 kurze Tipps (Einreise, Vorschriften, Do's/Don'ts).
+guides: 5–8 längere Abschnitte inkl. Einreisebestimmungen und lokale Gegebenheiten.
+Schweizer Hochdeutsch. JSON: {"items":[...],"tips":[...],"guides":[{"title","body"}]}. Max 20 Items.`,
       user: JSON.stringify({
         legs: args.legs,
         travelers: args.travelers.map((t) => ({
@@ -281,8 +292,8 @@ Schweizer Hochdeutsch. JSON: {"items":[...],"tips":[...],"guides":[{"title","bod
     );
 
     return {
-      items: items.slice(0, 12),
-      tips: (ai.tips || []).slice(0, 15).map(String),
+      items: items.slice(0, 20),
+      tips: (ai.tips || []).slice(0, 18).map(String),
       guides: mapGuides(ai.guides),
       source: "openai",
     };
@@ -311,11 +322,11 @@ export async function buildTravelInsights(args: {
       guides?: { title?: string; body?: string }[];
     }>({
       system: `Du bist Reiseberater für FlexiPack (Schweiz). Schreibe ausführliche, praxisnahe Tipps zu den gegebenen Etappen und Orten (location).
-Berücksichtige Klima, Formalitäten (ESTA/Visa), Gesundheit, Pack-Strategien, lokale Besonderheiten, Waschen, Transport.
+${DESTINATION_RESEARCH}
 Schweizer Hochdeutsch (ss statt ß).
 JSON: {
-  "tips": string[] (10–18 kurze Tipps),
-  "guides": [{ "title": string, "body": string }] (4–8 längere Abschnitte, je 3–6 Sätze)
+  "tips": string[] (12–20 kurze Tipps, mind. je 2 zu Einreise, Vorschriften, Do's/Don'ts),
+  "guides": [{ "title": string, "body": string }] (6–10 längere Abschnitte, je 3–8 Sätze; Titel z.B. «Einreise & Formalitäten», «Lokale Vorschriften», «Do's and Don'ts», «Klima & Alltag», «Gesundheit & Sicherheit»)
 }`,
       user: JSON.stringify({
         title: args.title,
@@ -329,7 +340,7 @@ JSON: {
     });
 
     return {
-      tips: (ai.tips || []).slice(0, 18).map(String),
+      tips: (ai.tips || []).slice(0, 20).map(String),
       guides: mapGuides(ai.guides),
       source: "openai",
     };

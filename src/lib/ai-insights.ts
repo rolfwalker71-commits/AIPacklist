@@ -26,7 +26,7 @@ export function parseAiInsights(raw: string | null | undefined): AiInsights {
             .filter((g) => g && typeof g === "object")
             .map((g) => ({
               title: String((g as AiGuide).title || "Hinweis").slice(0, 120),
-              body: String((g as AiGuide).body || "").slice(0, 4000),
+              body: String((g as AiGuide).body || "").slice(0, 5000),
             }))
             .filter((g) => g.body)
         : [],
@@ -39,8 +39,8 @@ export function parseAiInsights(raw: string | null | undefined): AiInsights {
 
 export function stringifyAiInsights(insights: AiInsights): string {
   return JSON.stringify({
-    tips: insights.tips.slice(0, 20),
-    guides: insights.guides.slice(0, 10),
+    tips: insights.tips.slice(0, 24),
+    guides: insights.guides.slice(0, 12),
     updatedAt: insights.updatedAt || new Date().toISOString(),
   });
 }
@@ -52,8 +52,8 @@ export function mergeInsights(
   const tips = incoming.tips?.length ? incoming.tips : current.tips;
   const guides = incoming.guides?.length ? incoming.guides : current.guides;
   return {
-    tips: tips.map(String).slice(0, 20),
-    guides: (guides || []).slice(0, 10),
+    tips: tips.map(String).slice(0, 24),
+    guides: (guides || []).slice(0, 12),
     updatedAt: new Date().toISOString(),
   };
 }

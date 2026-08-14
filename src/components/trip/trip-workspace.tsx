@@ -178,6 +178,14 @@ function resolveItemOwner(
   | { kind: "personal" } {
   if (item.isShared) return { kind: "shared" };
 
+  // Prefer explicit "für Name" over suitcase — AI often puts partner items in the wrong bag
+  const noteMatch = item.notes?.match(/für\s+([^·]+)/i);
+  if (noteMatch) {
+    const name = noteMatch[1].trim().toLowerCase();
+    const u = trip.members.find((m) => m.user.name.toLowerCase() === name)?.user;
+    if (u) return { kind: "user", user: u };
+  }
+
   const bag =
     trip.suitcases.find((s) => s.id === item.suitcaseId) ||
     (item.suitcase
@@ -189,13 +197,6 @@ function resolveItemOwner(
       trip.members.find((m) => m.user.id === bag.ownerUserId)?.user ||
       bag.owner ||
       null;
-    if (u) return { kind: "user", user: u };
-  }
-
-  const noteMatch = item.notes?.match(/für\s+([^·]+)/i);
-  if (noteMatch) {
-    const name = noteMatch[1].trim().toLowerCase();
-    const u = trip.members.find((m) => m.user.name.toLowerCase() === name)?.user;
     if (u) return { kind: "user", user: u };
   }
 

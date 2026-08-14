@@ -80,7 +80,7 @@ function hasTransport(legs: LegInput[], t: string): boolean {
   return legs.some((l) => l.transport === t);
 }
 
-function personalItemsForTraveler(
+export function personalItemsForTraveler(
   legs: LegInput[],
   traveler: TravelerProfile,
   noLaundryDays: number,

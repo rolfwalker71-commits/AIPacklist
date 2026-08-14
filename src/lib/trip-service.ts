@@ -1,14 +1,20 @@
 import { prisma } from "./db";
 import { buildPackList } from "./ai-pack";
+import {
+  daysWithoutLaundry,
+  personalItemsForTraveler,
+} from "./calculator";
 import { stringifyAiInsights, parseAiInsights } from "./ai-insights";
 import {
   allocateInviteCode,
   defaultInviteExpiry,
   serializeInvite,
 } from "./invite";
+import { inferPriority } from "./priority";
 import { USER_COLORS } from "./utils";
-import type { PackGender, TripDraft } from "./types";
+import type { DressCode, PackGender, TripDraft, WeatherTag } from "./types";
 import type { SuitcasePlan, SuitcaseSize } from "./suitcases";
+import { formatISO, startOfDay } from "date-fns";
 
 export type UserInput = {
   id?: string;
@@ -231,6 +237,136 @@ export async function createTripFromDraft(
     where: { id: trip.id },
     include: tripInclude,
   });
+}
+
+/**
+ * When someone joins a trip after creation, create their personal suitcase
+ * and personal pack items (templates/wizard only generate for travelers known
+ * at create time).
+ */
+export async function ensureMemberPackKit(tripId: string, userId: string) {
+  const trip = await prisma.trip.findUnique({
+    where: { id: tripId },
+    include: {
+      legs: { orderBy: { sortOrder: "asc" } },
+      suitcases: true,
+      items: true,
+      members: { include: { user: true } },
+    },
+  });
+  if (!trip) return;
+
+  const member = trip.members.find((m) => m.userId === userId);
+  if (!member) return;
+  const person = member.user;
+
+  let bag = trip.suitcases.find(
+    (s) => !s.isShared && s.ownerUserId === userId
+  );
+  if (!bag) {
+    bag = await prisma.suitcase.create({
+      data: {
+        tripId,
+        name: `Koffer (${person.name})`,
+        size: "MEDIUM",
+        isShared: false,
+        ownerUserId: userId,
+      },
+    });
+  }
+
+  const nameNeedle = `für ${person.name}`.toLowerCase();
+  // Claim personal items that were named for this person but landed in another bag
+  const misplaced = trip.items.filter(
+    (i) =>
+      !i.isShared &&
+      i.suitcaseId !== bag!.id &&
+      (i.notes || "").toLowerCase().includes(nameNeedle)
+  );
+  if (misplaced.length > 0) {
+    await prisma.packItem.updateMany({
+      where: { id: { in: misplaced.map((i) => i.id) } },
+      data: { suitcaseId: bag.id },
+    });
+  }
+
+  const alreadyOnBag = await prisma.packItem.count({
+    where: { tripId, isShared: false, suitcaseId: bag.id },
+  });
+
+  const legs = trip.legs.map((leg) => ({
+    name: leg.name,
+    location: leg.location,
+    startDate: formatISO(startOfDay(leg.startDate), { representation: "date" }),
+    endDate: formatISO(startOfDay(leg.endDate), { representation: "date" }),
+    transport: leg.transport as
+      | "SHIP"
+      | "FLIGHT"
+      | "CAR"
+      | "TRAIN"
+      | "OTHER",
+    laundryAvailable: leg.laundryAvailable,
+    laundryIntervalDays: leg.laundryIntervalDays,
+    weatherTags: JSON.parse(leg.weatherTags) as WeatherTag[],
+    dressCodes: JSON.parse(leg.dressCodes) as DressCode[],
+  }));
+
+  // Always top up personal basics if the joiner has few items (2nd, 3rd person, child, …)
+  if (alreadyOnBag < 8) {
+    const noLaundryDays = daysWithoutLaundry(legs);
+    const reserve = noLaundryDays >= 10 ? 2 : 1;
+    const personal = personalItemsForTraveler(
+      legs,
+      {
+        key: userId,
+        name: person.name,
+        gender: (person.gender as PackGender) || "UNSPECIFIED",
+      },
+      noLaundryDays,
+      reserve
+    );
+
+    const existingNames = new Set(
+      (
+        await prisma.packItem.findMany({
+          where: { tripId, suitcaseId: bag.id },
+          select: { name: true },
+        })
+      ).map((i) => i.name.toLowerCase())
+    );
+
+    const toAdd = personal.filter(
+      (item) => !existingNames.has(item.name.toLowerCase())
+    );
+    if (toAdd.length > 0) {
+      await prisma.packItem.createMany({
+        data: toAdd.map((item) => ({
+          tripId,
+          name: item.name,
+          category: item.category,
+          quantity: item.quantity,
+          isShared: false,
+          priority:
+            item.priority ||
+            inferPriority(item.name, item.category, item.notes),
+          notes: item.notes || `für ${person.name}`,
+          source: item.source || "calculator",
+          suitcaseId: bag!.id,
+        })),
+      });
+    }
+  }
+}
+
+/** Ensure every current member has a personal suitcase + basics (any Nth joiner). */
+export async function ensureAllMembersPackKits(tripId: string) {
+  const members = await prisma.tripMember.findMany({
+    where: { tripId },
+    select: { userId: true },
+  });
+  for (const m of members) {
+    await ensureMemberPackKit(tripId, m.userId);
+  }
 }
 
 export const tripInclude = {

@@ -8,7 +8,7 @@ import {
 } from "@/lib/ai-insights";
 import { isAiConfigured } from "@/lib/openai";
 import { publish } from "@/lib/events";
-import { serializeTrip, tripInclude } from "@/lib/trip-service";
+import { serializeTrip, tripInclude, ensureAllMembersPackKits } from "@/lib/trip-service";
 import type { PackGender, TravelerProfile } from "@/lib/types";
 
 export async function POST(
@@ -27,21 +27,24 @@ export async function POST(
       );
     }
 
-    const trip = await prisma.trip.findUnique({
+    // Fill personal kits for any member who joined later (2nd, 3rd, Kind, …)
+    await ensureAllMembersPackKits(tripId);
+
+    const tripFresh = await prisma.trip.findUnique({
       where: { id: tripId },
       include: tripInclude,
     });
-    if (!trip) {
+    if (!tripFresh) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
 
-    const travelers: TravelerProfile[] = trip.members.map((m) => ({
+    const travelers: TravelerProfile[] = tripFresh.members.map((m) => ({
       key: m.userId,
       name: m.user.name,
       gender: (m.user.gender as PackGender) || "UNSPECIFIED",
     }));
 
-    const legs = trip.legs.map((leg) => ({
+    const legs = tripFresh.legs.map((leg) => ({
       name: leg.name,
       location: leg.location,
       startDate: leg.startDate.toISOString().slice(0, 10),
@@ -53,7 +56,7 @@ export async function POST(
       dressCodes: JSON.parse(leg.dressCodes) as never[],
     }));
 
-    const existing = trip.items.map((i) => ({
+    const existing = tripFresh.items.map((i) => ({
       name: i.name,
       category: i.category,
       quantity: i.quantity,
@@ -69,8 +72,8 @@ export async function POST(
       existing,
     });
 
-    const sharedBag = trip.suitcases.find((s) => s.isShared);
-    const personalBags = trip.suitcases.filter((s) => !s.isShared);
+    const sharedBag = tripFresh.suitcases.find((s) => s.isShared);
+    const personalBags = tripFresh.suitcases.filter((s) => !s.isShared);
 
     for (const item of enriched.items) {
       const owner =
@@ -99,7 +102,7 @@ export async function POST(
     }
 
     if (enriched.tips.length || enriched.guides.length) {
-      const next = mergeInsights(parseAiInsights(trip.aiInsights), {
+      const next = mergeInsights(parseAiInsights(tripFresh.aiInsights), {
         tips: enriched.tips,
         guides: enriched.guides,
       });
