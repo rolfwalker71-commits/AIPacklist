@@ -1,5 +1,16 @@
-const CACHE = "flexipack-v4";
-const PRECACHE = ["/", "/manifest.webmanifest"];
+const CACHE = "flexipack-v5";
+const PRECACHE = [
+  "/",
+  "/manifest.webmanifest",
+  "/icons/push-pack.png",
+  "/icons/push-team.png",
+  "/icons/push-route.png",
+  "/icons/push-tips.png",
+  "/icons/push-card-pack.png",
+  "/icons/push-card-team.png",
+  "/icons/push-card-route.png",
+  "/icons/push-card-tips.png",
+];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -53,12 +64,22 @@ self.addEventListener("fetch", (event) => {
   );
 });
 
+const MOTIF_FALLBACK = {
+  pack: { icon: "/icons/push-pack.png", image: "/icons/push-card-pack.png" },
+  team: { icon: "/icons/push-team.png", image: "/icons/push-card-team.png" },
+  route: { icon: "/icons/push-route.png", image: "/icons/push-card-route.png" },
+  tips: { icon: "/icons/push-tips.png", image: "/icons/push-card-tips.png" },
+};
+
 self.addEventListener("push", (event) => {
   let data = {
     title: "FlexiPack",
     body: "Update zu eurer Reise",
     url: "/",
     tag: "flexipack",
+    motif: "pack",
+    icon: "",
+    image: "",
   };
   try {
     if (event.data) {
@@ -74,13 +95,18 @@ self.addEventListener("push", (event) => {
     }
   }
 
+  const fallback = MOTIF_FALLBACK[data.motif] || MOTIF_FALLBACK.pack;
+  const icon = data.icon || fallback.icon || "/icons/icon-192.png";
+  const image = data.image || fallback.image;
+
   event.waitUntil(
     self.registration.showNotification(data.title || "FlexiPack", {
       body: data.body,
-      icon: "/icons/icon-192.png",
+      icon,
       badge: "/icons/icon-192.png",
+      image,
       tag: data.tag || "flexipack",
-      data: { url: data.url || "/" },
+      data: { url: data.url || "/", motif: data.motif || "pack" },
       renotify: true,
     })
   );

@@ -151,7 +151,7 @@ export function PushOptInCard() {
       </p>
       <p className="text-xs text-stone-600">
         Meilensteine (50 %/100 %), Beitritte, Routenänderungen und neue Tipps —
-        auf allen Geräten der Mitreisenden. Nicht bei jedem Abhaken.
+        mit FlexiPack-Motif-Karten. Nicht bei jedem Abhaken.
       </p>
       <div className="flex flex-wrap gap-2">
         {!subscribed ? (

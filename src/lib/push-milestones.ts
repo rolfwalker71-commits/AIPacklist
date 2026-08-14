@@ -28,6 +28,7 @@ export async function maybeNotifyPackMilestones(tripId: string) {
       body: "Alles gepackt — bereit für die Reise.",
       url: `/trip/${tripId}`,
       tag: `milestone-100-${tripId}`,
+      motif: "pack",
     });
   } else if (progress.pct >= 50 && !trip.pushMilestone50At) {
     data.pushMilestone50At = new Date();
@@ -36,6 +37,7 @@ export async function maybeNotifyPackMilestones(tripId: string) {
       body: `Zur Hälfte gepackt (${progress.packed}/${progress.total}).`,
       url: `/trip/${tripId}`,
       tag: `milestone-50-${tripId}`,
+      motif: "pack",
     });
   }
 

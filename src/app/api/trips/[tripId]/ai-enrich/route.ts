@@ -254,6 +254,7 @@ export async function POST(
         body: "Neue Reisetipps sind bereit.",
         url: `/trip/${tripId}?tab=ai`,
         tag: `tips-${tripId}`,
+        motif: "tips",
       });
     }
 

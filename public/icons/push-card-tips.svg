@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="720" height="360" viewBox="0 0 720 360">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="720" y2="360">
+      <stop stop-color="#134E4A"/>
+      <stop offset="1" stop-color="#0F766E"/>
+    </linearGradient>
+  </defs>
+  <rect width="720" height="360" rx="28" fill="url(#g)"/>
+  <circle cx="160" cy="160" r="48" fill="#FBBF24" opacity="0.9"/>
+  <rect x="120" y="130" width="80" height="60" rx="12" fill="#FFF" opacity="0.92"/>
+  <text x="280" y="150" fill="#CCFBF1" font-family="Arial, Helvetica, sans-serif" font-size="34" font-weight="700">FlexiPack</text>
+  <text x="280" y="210" fill="#FFFFFF" font-family="Arial, Helvetica, sans-serif" font-size="40" font-weight="600">Neue Tipps</text>
+</svg>

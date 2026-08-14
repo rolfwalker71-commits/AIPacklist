@@ -1,11 +1,34 @@
 import webpush from "web-push";
 import { prisma } from "@/lib/db";
 
+export type PushMotif = "pack" | "team" | "route" | "tips";
+
 export type PushPayload = {
   title: string;
   body: string;
   url?: string;
   tag?: string;
+  /** Motif card art for notification icon + large image (Android). */
+  motif?: PushMotif;
+};
+
+const MOTIF_ASSETS: Record<PushMotif, { icon: string; image: string }> = {
+  pack: {
+    icon: "/icons/push-pack.png",
+    image: "/icons/push-card-pack.png",
+  },
+  team: {
+    icon: "/icons/push-team.png",
+    image: "/icons/push-card-team.png",
+  },
+  route: {
+    icon: "/icons/push-route.png",
+    image: "/icons/push-card-route.png",
+  },
+  tips: {
+    icon: "/icons/push-tips.png",
+    image: "/icons/push-card-tips.png",
+  },
 };
 
 function vapidConfigured() {
@@ -55,11 +78,17 @@ export async function notifyTripMembers(
   });
   if (!subs.length) return { sent: 0 };
 
+  const motif = payload.motif || "pack";
+  const assets = MOTIF_ASSETS[motif];
+
   const body = JSON.stringify({
     title: payload.title,
     body: payload.body,
     url: payload.url || `/trip/${tripId}`,
     tag: payload.tag || `trip-${tripId}`,
+    motif,
+    icon: assets.icon,
+    image: assets.image,
   });
 
   let sent = 0;
@@ -117,6 +146,7 @@ export function scheduleRoutePush(
         : "Die Route wurde aktualisiert.",
       url: `/trip/${tripId}?tab=legs`,
       tag: `route-${tripId}`,
+      motif: "route",
     });
   }, 30_000);
   routePushTimers.set(tripId, timer);

@@ -82,6 +82,7 @@ export async function POST(
           body: `${sessionUser.name} ist der Reise beigetreten.`,
           url: `/trip/${tripId}?tab=people`,
           tag: `join-${tripId}-${sessionUser.id}`,
+          motif: "team",
         },
         { excludeUserId: sessionUser.id }
       );
