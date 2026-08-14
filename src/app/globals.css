@@ -24,9 +24,9 @@ body {
 }
 
 .font-display {
-  font-family: var(--font-fraunces), Georgia, "Times New Roman", serif;
+  font-family: var(--font-outfit), "Segoe UI", Helvetica, Arial, sans-serif;
   font-weight: 600;
-  letter-spacing: -0.025em;
+  letter-spacing: -0.02em;
 }
 
 .app-shell {

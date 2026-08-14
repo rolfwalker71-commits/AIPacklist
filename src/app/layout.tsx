@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Fraunces, Outfit } from "next/font/google";
+import { Outfit } from "next/font/google";
 import { headers } from "next/headers";
 import { Suspense } from "react";
 import { AppBottomNav } from "@/components/app/app-bottom-nav";
@@ -9,12 +9,6 @@ import "./globals.css";
 const outfit = Outfit({
   subsets: ["latin"],
   variable: "--font-outfit",
-  display: "swap",
-});
-
-const fraunces = Fraunces({
-  subsets: ["latin"],
-  variable: "--font-fraunces",
   display: "swap",
 });
 
@@ -53,7 +47,7 @@ export default async function RootLayout({
   return (
     <html
       lang="de-CH"
-      className={`${outfit.variable} ${fraunces.variable} ${outfit.className}`}
+      className={`${outfit.variable} ${outfit.className}`}
     >
       <body className="font-sans antialiased">
         <div className={`app-shell min-h-screen ${isLogin ? "" : "pb-24"}`}>
