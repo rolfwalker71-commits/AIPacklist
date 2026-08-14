@@ -67,6 +67,12 @@ export async function PATCH(
       },
     });
 
+    if (typeof packed === "boolean") {
+      void import("@/lib/push-milestones").then((m) =>
+        m.maybeNotifyPackMilestones(tripId)
+      );
+    }
+
     return NextResponse.json({
       ...updated,
       packedAt: updated.packedAt?.toISOString() ?? null,

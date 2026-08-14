@@ -15,7 +15,10 @@ import {
   Clock,
   ListChecks,
   X,
+  Printer,
+  CloudSun,
 } from "lucide-react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -25,15 +28,18 @@ import { SwipeRow } from "@/components/ui/swipe-row";
 import { TravelMotif, SuitcaseCardArt, ChecklistMotif, TipsMotif, TeamMotif } from "@/components/app/travel-motif";
 import { BrandLogo } from "@/components/app/brand-logo";
 import { AddPackItemForm } from "@/components/trip/add-pack-item-form";
+import { PackProgressCard } from "@/components/trip/pack-progress-card";
+import { PushOptInCard } from "@/components/app/push-opt-in";
 import {
   ParticipantFilter,
   sharedFilterOption,
 } from "@/components/trip/participant-filter";
 import { cn, formatDate } from "@/lib/utils";
-import type { PackGender, Transport } from "@/lib/types";
+import type { PackGender, Transport, WeatherTag } from "@/lib/types";
 import { SUITCASE_SIZES } from "@/lib/suitcases";
 import { SHARED_COLOR, tileStyle } from "@/lib/colors";
 import { LOCATION_PRESETS } from "@/lib/locations";
+import { WEATHER_TAG_LABELS } from "@/lib/weather";
 import {
   priorityLabel,
   priorityRank,
@@ -88,6 +94,13 @@ type TripLeg = {
   laundryAvailable: boolean;
   weatherTags: string[];
   dressCodes: string[];
+  weatherSummary?: {
+    label: string;
+    tMin: number | null;
+    tMax: number | null;
+    rainMm: number | null;
+    fetchedAt: string;
+  } | null;
   startDate: string;
   endDate: string;
 };
@@ -362,8 +375,10 @@ export function TripWorkspace({
     endDate: "",
     transport: "OTHER" as Transport,
     laundryAvailable: false,
+    weatherTags: [] as WeatherTag[],
   });
   const [legBusy, setLegBusy] = useState(false);
+  const [weatherBusy, setWeatherBusy] = useState(false);
 
   useEffect(() => {
     setUser(sessionUser);
@@ -860,6 +875,9 @@ export function TripWorkspace({
         ? leg.transport
         : "OTHER") as Transport,
       laundryAvailable: leg.laundryAvailable,
+      weatherTags: (leg.weatherTags || []).filter((t): t is WeatherTag =>
+        t in WEATHER_TAG_LABELS
+      ),
     });
   };
 
@@ -878,6 +896,7 @@ export function TripWorkspace({
           endDate: legDraft.endDate,
           transport: legDraft.transport,
           laundryAvailable: legDraft.laundryAvailable,
+          weatherTags: legDraft.weatherTags,
         }),
       });
       if (!res.ok) {
@@ -898,6 +917,35 @@ export function TripWorkspace({
       return true;
     } finally {
       setLegBusy(false);
+    }
+  };
+
+  const loadWeather = async (legId?: string) => {
+    setWeatherBusy(true);
+    setAiMessage(null);
+    try {
+      const res = await fetch(`/api/trips/${trip.id}/weather`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(legId ? { legId } : {}),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setAiMessage(
+          typeof data.error === "string" ? data.error : "Wetter fehlgeschlagen"
+        );
+        return;
+      }
+      setTrip({ ...data, aiInsights: normalizeInsights(data.aiInsights) });
+      setAiMessage(
+        typeof data.message === "string"
+          ? data.message
+          : "Wetter aktualisiert"
+      );
+    } catch (e) {
+      setAiMessage(e instanceof Error ? e.message : "Wetter fehlgeschlagen");
+    } finally {
+      setWeatherBusy(false);
     }
   };
 
@@ -1382,6 +1430,15 @@ export function TripWorkspace({
           />
         </div>
 
+        <div className="flex flex-wrap gap-2">
+          <Link href={`/trip/${trip.id}/print`}>
+            <Button type="button" variant="outline" size="sm">
+              <Printer className="h-3.5 w-3.5" />
+              Liste drucken
+            </Button>
+          </Link>
+        </div>
+
         <button
           type="button"
           onClick={() => setHeaderDetails((v) => !v)}
@@ -1455,6 +1512,8 @@ export function TripWorkspace({
               Filtern, abhaken, eigene Positionen ergänzen.
             </p>
           </div>
+
+          <PackProgressCard trip={trip} />
 
           <div className="card-surface space-y-3 p-3.5">
             <div className="flex flex-wrap items-center gap-2">
@@ -1580,8 +1639,20 @@ export function TripWorkspace({
             <p className="text-eyebrow text-amber-100/85">Route</p>
             <h2 className="mt-1 font-display text-section-title">Etappen der Reise</h2>
             <p className="mt-1 max-w-[18rem] text-base text-amber-50/90">
-              Orte, Transport und Wäsche — getrennt von der Packliste.
+              Orte, Transport und Wetter — getrennt von der Packliste.
             </p>
+          </div>
+          <div className="flex flex-wrap justify-end gap-2">
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              disabled={weatherBusy}
+              onClick={() => void loadWeather()}
+            >
+              <CloudSun className="h-3.5 w-3.5" />
+              {weatherBusy ? "Wetter…" : "Wetter für alle Etappen"}
+            </Button>
           </div>
           <div className="space-y-2">
             <h3 className="font-display text-section-title text-stone-900">Etappen</h3>
@@ -1623,10 +1694,21 @@ export function TripWorkspace({
                       <p className="mt-1 text-sm text-stone-600">
                         Wäsche: {leg.laundryAvailable ? "Ja" : "Nein"}
                         {(leg.weatherTags || []).length > 0
-                          ? ` · ${(leg.weatherTags || []).join(", ")}`
+                          ? ` · ${(leg.weatherTags || [])
+                              .map(
+                                (t) =>
+                                  WEATHER_TAG_LABELS[t as WeatherTag] || t
+                              )
+                              .join(", ")}`
                           : ""}
                       </p>
-                      <div className="mt-3">
+                      {leg.weatherSummary?.label && (
+                        <p className="mt-1 text-sm text-teal-900">
+                          <CloudSun className="mr-1 inline h-3.5 w-3.5" />
+                          {leg.weatherSummary.label}
+                        </p>
+                      )}
+                      <div className="mt-3 flex flex-wrap gap-2">
                         <Button
                           type="button"
                           size="sm"
@@ -1634,6 +1716,16 @@ export function TripWorkspace({
                           onClick={() => startEditLeg(leg)}
                         >
                           Datum & Destination ändern
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          disabled={weatherBusy || !leg.location}
+                          onClick={() => void loadWeather(leg.id)}
+                        >
+                          <CloudSun className="h-3.5 w-3.5" />
+                          Wetter
                         </Button>
                       </div>
                     </li>
@@ -1741,6 +1833,38 @@ export function TripWorkspace({
                       />
                       Wäsche verfügbar
                     </label>
+                  </div>
+                  <div className="sm:col-span-2">
+                    <Label>Wetter-Tags</Label>
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {(
+                        Object.keys(WEATHER_TAG_LABELS) as WeatherTag[]
+                      ).map((tag) => {
+                        const on = legDraft.weatherTags.includes(tag);
+                        return (
+                          <button
+                            key={tag}
+                            type="button"
+                            onClick={() =>
+                              setLegDraft((d) => ({
+                                ...d,
+                                weatherTags: on
+                                  ? d.weatherTags.filter((t) => t !== tag)
+                                  : [...d.weatherTags, tag],
+                              }))
+                            }
+                            className={cn(
+                              "rounded-full border px-2.5 py-1 text-[11px] font-medium",
+                              on
+                                ? "border-teal-700 bg-teal-50 text-teal-900"
+                                : "border-stone-200 bg-stone-50 text-stone-600"
+                            )}
+                          >
+                            {WEATHER_TAG_LABELS[tag]}
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
                 </div>
                 <div className="mt-4 flex flex-wrap gap-2">
@@ -2261,6 +2385,9 @@ export function TripWorkspace({
               Profil, Mitreisende, Pack-Einladung — und Route als Vorlage teilen.
             </p>
           </div>
+
+          <PackProgressCard trip={trip} />
+          <PushOptInCard />
 
           <div className="grid gap-4 rounded-2xl border border-stone-200 bg-white/70 p-4 md:grid-cols-3">
             <div className="space-y-3">

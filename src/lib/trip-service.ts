@@ -14,6 +14,7 @@ import {
   routeShareStatus,
   serializeRouteShare,
 } from "./route-share";
+import { parseWeatherSummary } from "./weather";
 import { inferPriority } from "./priority";
 import { USER_COLORS } from "./utils";
 import type { DressCode, PackGender, TripDraft, WeatherTag } from "./types";
@@ -561,6 +562,9 @@ export function serializeTrip(
       endDate: leg.endDate.toISOString(),
       weatherTags: JSON.parse(leg.weatherTags) as string[],
       dressCodes: JSON.parse(leg.dressCodes) as string[],
+      weatherSummary: parseWeatherSummary(
+        (leg as { weatherSummary?: string | null }).weatherSummary
+      ),
     })),
     items: trip.items.map((item) => ({
       ...item,

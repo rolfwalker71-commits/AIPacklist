@@ -43,11 +43,12 @@ model User {
   gender       Gender   @default(UNSPECIFIED)
   createdAt    DateTime @default(now())
 
-  ownedTrips  Trip[]         @relation("TripOwner")
-  memberships TripMember[]
-  suitcases   Suitcase[]
-  packedItems PackItem[]     @relation("PackedBy")
-  sessions    Session[]
+  ownedTrips         Trip[]              @relation("TripOwner")
+  memberships        TripMember[]
+  suitcases          Suitcase[]
+  packedItems        PackItem[]          @relation("PackedBy")
+  sessions           Session[]
+  pushSubscriptions  PushSubscription[]
 }
 
 model Session {
@@ -55,6 +56,20 @@ model Session {
   tokenHash String   @unique
   userId    String
   expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model PushSubscription {
+  id        String   @id @default(cuid())
+  userId    String
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  userAgent String?
   createdAt DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -78,6 +93,9 @@ model Trip {
   routeShareExpiresAt DateTime?
   routeShareMaxUses   Int?
   routeShareUseCount  Int       @default(0)
+  /// Push milestones already fired (avoid spam on re-cross)
+  pushMilestone50At   DateTime?
+  pushMilestone100At  DateTime?
   aiInsights      String    @default("{}")
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
@@ -114,6 +132,8 @@ model Leg {
   laundryIntervalDays Int?
   weatherTags         String    @default("[]")
   dressCodes          String    @default("[]")
+  /// Cached Open-Meteo summary JSON: { label, tMin, tMax, rainMm, fetchedAt, lat, lon }
+  weatherSummary      String?
   sortOrder           Int       @default(0)
 
   tripId String

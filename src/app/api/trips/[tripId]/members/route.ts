@@ -5,6 +5,7 @@ import { publish } from "@/lib/events";
 import { authErrorResponse, requireSessionUser } from "@/lib/auth";
 import { userCanAccessTrip } from "@/lib/trip-access";
 import { inviteStatus } from "@/lib/invite";
+import { notifyTripMembers } from "@/lib/push";
 
 export async function POST(
   req: NextRequest,
@@ -73,6 +74,17 @@ export async function POST(
         tripId,
         payload: { userId: sessionUser.id },
       });
+
+      void notifyTripMembers(
+        tripId,
+        {
+          title: trip.title.slice(0, 50),
+          body: `${sessionUser.name} ist der Reise beigetreten.`,
+          url: `/trip/${tripId}?tab=people`,
+          tag: `join-${tripId}-${sessionUser.id}`,
+        },
+        { excludeUserId: sessionUser.id }
+      );
     }
 
     if (profile) {

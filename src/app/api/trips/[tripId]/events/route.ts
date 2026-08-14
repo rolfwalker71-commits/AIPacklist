@@ -1,5 +1,7 @@
 import { NextRequest } from "next/server";
 import { subscribe, type TripEvent } from "@/lib/events";
+import { getSessionUser } from "@/lib/auth";
+import { userCanAccessTrip } from "@/lib/trip-access";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -9,6 +11,14 @@ export async function GET(
   { params }: { params: Promise<{ tripId: string }> }
 ) {
   const { tripId } = await params;
+  const user = await getSessionUser();
+  if (!user || !(await userCanAccessTrip(user.id, tripId))) {
+    return new Response(JSON.stringify({ error: "Kein Zugang" }), {
+      status: 403,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
   const encoder = new TextEncoder();
 
   let cleanup: (() => void) | undefined;

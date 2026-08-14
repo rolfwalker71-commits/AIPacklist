@@ -10,6 +10,7 @@ import { isAiConfigured } from "@/lib/openai";
 import { publish } from "@/lib/events";
 import { serializeTrip, tripInclude } from "@/lib/trip-service";
 import type { PackGender, TravelerProfile } from "@/lib/types";
+import { notifyTripMembers } from "@/lib/push";
 
 export async function POST(
   _req: NextRequest,
@@ -81,6 +82,12 @@ export async function POST(
       include: tripInclude,
     });
     publish({ type: "trip_updated", tripId });
+    void notifyTripMembers(tripId, {
+      title: trip.title.slice(0, 50),
+      body: "Neue Reisetipps sind bereit.",
+      url: `/trip/${tripId}?tab=ai`,
+      tag: `tips-${tripId}`,
+    });
 
     return NextResponse.json({
       ...serializeTrip(full),

@@ -3,12 +3,26 @@ import { prisma } from "@/lib/db";
 import { publish } from "@/lib/events";
 import { serializeTrip, tripInclude } from "@/lib/trip-service";
 import type { Transport } from "@prisma/client";
+import { scheduleRoutePush } from "@/lib/push";
+import { requireSessionUser } from "@/lib/auth";
+import { userCanAccessTrip } from "@/lib/trip-access";
 
 export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ tripId: string }> }
 ) {
   const { tripId } = await params;
+  let actorName: string | undefined;
+  try {
+    const user = await requireSessionUser();
+    if (!(await userCanAccessTrip(user.id, tripId))) {
+      return NextResponse.json({ error: "Kein Zugang" }, { status: 403 });
+    }
+    actorName = user.name;
+  } catch {
+    return NextResponse.json({ error: "Nicht angemeldet" }, { status: 401 });
+  }
+
   const body = await req.json();
   const legId = String(body.legId || "");
   if (!legId) {
@@ -92,6 +106,7 @@ export async function PATCH(
     include: tripInclude,
   });
   publish({ type: "trip_updated", tripId });
+  scheduleRoutePush(tripId, full.title, actorName);
   return NextResponse.json(serializeTrip(full));
 }
 
@@ -100,6 +115,17 @@ export async function DELETE(
   { params }: { params: Promise<{ tripId: string }> }
 ) {
   const { tripId } = await params;
+  let actorName: string | undefined;
+  try {
+    const user = await requireSessionUser();
+    if (!(await userCanAccessTrip(user.id, tripId))) {
+      return NextResponse.json({ error: "Kein Zugang" }, { status: 403 });
+    }
+    actorName = user.name;
+  } catch {
+    return NextResponse.json({ error: "Nicht angemeldet" }, { status: 401 });
+  }
+
   const body = await req.json().catch(() => ({}));
   const legId =
     (body as { legId?: string }).legId ||
@@ -146,5 +172,6 @@ export async function DELETE(
     include: tripInclude,
   });
   publish({ type: "trip_updated", tripId });
+  scheduleRoutePush(tripId, full.title, actorName);
   return NextResponse.json(serializeTrip(full));
 }

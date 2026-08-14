@@ -21,6 +21,7 @@ import {
   softCapacityFor,
   type BagForAssign,
 } from "@/lib/suitcase-capacity";
+import { notifyTripMembers } from "@/lib/push";
 
 export async function POST(
   req: NextRequest,
@@ -247,6 +248,12 @@ export async function POST(
       await prisma.trip.update({
         where: { id: tripId },
         data: { aiInsights: stringifyAiInsights(next) },
+      });
+      void notifyTripMembers(tripId, {
+        title: tripFresh.title.slice(0, 50),
+        body: "Neue Reisetipps sind bereit.",
+        url: `/trip/${tripId}?tab=ai`,
+        tag: `tips-${tripId}`,
       });
     }
 
