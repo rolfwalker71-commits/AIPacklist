@@ -47,7 +47,7 @@ export async function POST(
       (body as { rebalance?: boolean }).rebalance ?? true
     );
 
-    await ensureAllMembersPackKits(tripId);
+    await ensureAllMembersPackKits(tripId, { skipBasics: true });
 
     const tripFresh = await prisma.trip.findUnique({
       where: { id: tripId },
@@ -75,15 +75,29 @@ export async function POST(
       dressCodes: JSON.parse(leg.dressCodes) as never[],
     }));
 
-    const existing = tripFresh.items.map((i) => ({
-      name: i.name,
-      category: i.category,
-      quantity: i.quantity,
-      isShared: i.isShared,
-      priority: i.priority as "EARLY" | "NORMAL" | "DAY_OF",
-      notes: i.notes || undefined,
-      source: (i.source as "calculator") || "calculator",
-    }));
+    const existing = tripFresh.items.map((i) => {
+      const noteMatch = i.notes?.match(/für\s+([^·]+)/i);
+      const fromNote = noteMatch
+        ? travelers.find(
+            (t) => t.name.toLowerCase() === noteMatch[1].trim().toLowerCase()
+          )?.key
+        : null;
+      const bag = tripFresh.suitcases.find((s) => s.id === i.suitcaseId);
+      const fromBag =
+        bag && !bag.isShared && bag.ownerUserId ? bag.ownerUserId : null;
+      return {
+        name: i.name,
+        category: i.category,
+        quantity: i.quantity,
+        isShared: i.isShared,
+        priority: i.priority as "EARLY" | "NORMAL" | "DAY_OF",
+        notes: i.notes || undefined,
+        source: (i.source as "calculator") || "calculator",
+        assigneeKey: i.isShared
+          ? ("shared" as const)
+          : fromNote || fromBag || undefined,
+      };
+    });
 
     const bags: BagForAssign[] = tripFresh.suitcases.map((s) => ({
       id: s.id,

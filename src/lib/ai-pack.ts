@@ -6,6 +6,7 @@ import {
   parseAiPriority,
   type PackPriority,
 } from "./priority";
+import { filterNewPackItems } from "./pack-dedupe";
 import type { CalculatedItem, LegInput, TravelerProfile } from "./types";
 
 type AiPackResponse = {
@@ -283,21 +284,26 @@ export async function enrichPackListWithAi(args: {
   try {
     const bags = args.suitcases || [];
     const ai = await aiJsonCompletion<AiPackResponse>({
-      system: `Du ergänzt eine FlexiPack-Packliste und lieferst ausführliche Reiseinfos.
-Nur fehlende Items. Für JEDE Person in travelers prüfen, ob persönliche Basics und zielbezogene Formalitäten fehlen — auch für später hinzugekommene Personen/Kinder.
-Persönlich vs gemeinsam wie üblich. ${DESTINATION_RESEARCH}
+      system: `Du bist Packlisten-Experte für FlexiPack (Schweiz). Erstelle die ideale, vollständige Packliste für diese Reise — und liefere Reiseinfos.
 
-Koffer-Kapazität (wichtig):
-- suitcases listen Name, Grösse, Soft-Max-Positionen und aktuelle Belegung.
-- Ordne jedes neue Item einem existierenden Koffer zu (suggestedBag = exakter Koffer-Name).
-- Persönliche Items → persönlicher Koffer der Person; Gemeinsames → gemeinsamer Koffer.
-- Wenn Soft-Limits knapp/überschritten wären: capacityNote auf Deutsch formulieren (z.B. zusätzlicher Koffer / grössere Grösse / umpacken). Sonst capacityNote=null.
+Wichtig — Abgleich mit «existing» (bereits auf der Liste):
+- Denke die Idealliste komplett (wie bei einer neuen Reise).
+- Gib in «items» NUR Positionen zurück, die in existing für dieselbe Person (forTraveler) bzw. als Gemeinsam NOCH FEHLEN.
+- Semantische Duplikate NIEMALS erneut vorschlagen: Pass≈Reisepass≈Ausweis, T-Shirt≈Shirt≈Oberteil, Socken≈Sockenpaar, Ladekabel≈USB-Kabel, Sonnencreme≈Sonnenschutz, Regenjacke≈Regenmantel, Zahnbürste≈Zahnputzzeug, Medikamente≈Reiseapotheke, Unterwäsche≈Slips/Boxershorts.
+- Auch ähnliche Schreibweisen, Singular/Plural und «für Name» in notes zählen als schon vorhanden.
+- Mengen bestehender Items nicht erhöhen — nur ganz neue Lücken schliessen.
+- Für JEDE Person in travelers prüfen: persönliche Basics und zielbezogene Formalitäten.
+- Persönlich vs gemeinsam wie üblich. ${DESTINATION_RESEARCH}
 
-tips: 10–15 kurze Tipps (Einreise, Vorschriften, Do's/Don'ts).
-guides: 5–8 längere Abschnitte inkl. Einreisebestimmungen und lokale Gegebenheiten.
-Schweizer Hochdeutsch.
+Koffer-Kapazität:
+- suitcases: Name, Grösse, Soft-Max, aktuelle Belegung.
+- suggestedBag = exakter Koffer-Name; persönlich → Personenkoffer, gemeinsam → gemeinsamer Koffer.
+- capacityNote auf Deutsch wenn Limits knapp, sonst null.
+
+tips: 10–15 kurze Tipps. guides: 5–8 längere Abschnitte.
+Schweizer Hochdeutsch (ss).
 JSON: {"items":[{"name","category","quantity","isShared","notes","forTraveler","priority","suggestedBag"}],"tips":[...],"guides":[{"title","body"}],"capacityNote":string|null}.
-Max 20 Items.`,
+Max 35 Items (nur echte Lücken).`,
       user: JSON.stringify({
         legs: args.legs,
         travelers: args.travelers.map((t) => ({
@@ -310,34 +316,37 @@ Max 20 Items.`,
           category: i.category,
           isShared: i.isShared,
           notes: i.notes,
+          forTraveler: i.isShared
+            ? null
+            : (i.notes || "").match(/für\s+([^·]+)/i)?.[1]?.trim() || null,
           priority: i.priority,
         })),
       }),
-      temperature: 0.4,
+      temperature: 0.3,
     });
 
-    const existingNames = new Set(
-      args.existing.map((i) => i.name.toLowerCase())
-    );
     const bagByName = new Map(
       bags.map((b) => [b.name.toLowerCase(), b.id] as const)
     );
-    const items = mapAiItems(ai.items || [], args.travelers)
-      .filter((i) => !existingNames.has(i.name.toLowerCase()))
-      .map((i) => {
-        const hint = i.suggestedBag?.trim();
-        const preferredSuitcaseId = hint
-          ? bagByName.get(hint.toLowerCase()) || null
-          : null;
-        return { ...i, preferredSuitcaseId: preferredSuitcaseId || undefined };
-      });
+    const mapped = mapAiItems(ai.items || [], args.travelers).map((i) => {
+      const hint = i.suggestedBag?.trim();
+      const preferredSuitcaseId = hint
+        ? bagByName.get(hint.toLowerCase()) || null
+        : null;
+      return { ...i, preferredSuitcaseId: preferredSuitcaseId || undefined };
+    });
+
+    // Server-side semantic dedupe (AI alone is not reliable enough)
+    const items = filterNewPackItems(mapped, args.existing).slice(0, 35);
 
     return {
-      items: items.slice(0, 20),
+      items,
       tips: (ai.tips || []).slice(0, 18).map(String),
       guides: mapGuides(ai.guides),
       source: "openai",
-      capacityNote: ai.capacityNote ? String(ai.capacityNote).slice(0, 400) : null,
+      capacityNote: ai.capacityNote
+        ? String(ai.capacityNote).slice(0, 400)
+        : null,
     };
   } catch {
     return {

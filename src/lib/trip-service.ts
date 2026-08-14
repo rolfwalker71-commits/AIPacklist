@@ -16,6 +16,7 @@ import {
 } from "./route-share";
 import { parseWeatherSummary } from "./weather";
 import { inferPriority } from "./priority";
+import { filterNewPackItems } from "./pack-dedupe";
 import { USER_COLORS } from "./utils";
 import type { DressCode, PackGender, TripDraft, WeatherTag } from "./types";
 import type { SuitcasePlan, SuitcaseSize } from "./suitcases";
@@ -380,8 +381,15 @@ export async function createTripFromRouteShare(
  * When someone joins a trip after creation, create their personal suitcase
  * and personal pack items (templates/wizard only generate for travelers known
  * at create time).
+ *
+ * skipBasics: only ensure suitcase exists (used before AI enrich so rigid
+ * calculator rules don't fight the AI list and create near-duplicates).
  */
-export async function ensureMemberPackKit(tripId: string, userId: string) {
+export async function ensureMemberPackKit(
+  tripId: string,
+  userId: string,
+  opts?: { skipBasics?: boolean }
+) {
   const trip = await prisma.trip.findUnique({
     where: { id: tripId },
     include: {
@@ -427,31 +435,38 @@ export async function ensureMemberPackKit(tripId: string, userId: string) {
     });
   }
 
-  const alreadyOnBag = await prisma.packItem.count({
-    where: { tripId, isShared: false, suitcaseId: bag.id },
-  });
+  if (opts?.skipBasics) return;
 
-  const legs = trip.legs.map((leg) => ({
-    name: leg.name,
-    location: leg.location,
-    startDate: formatISO(startOfDay(leg.startDate), { representation: "date" }),
-    endDate: formatISO(startOfDay(leg.endDate), { representation: "date" }),
-    transport: leg.transport as
-      | "SHIP"
-      | "FLIGHT"
-      | "CAR"
-      | "TRAIN"
-      | "OTHER",
-    laundryAvailable: leg.laundryAvailable,
-    laundryIntervalDays: leg.laundryIntervalDays,
-    weatherTags: JSON.parse(leg.weatherTags) as WeatherTag[],
-    dressCodes: JSON.parse(leg.dressCodes) as DressCode[],
-  }));
+  const personalExisting = trip.items.filter(
+    (i) =>
+      !i.isShared &&
+      ((i.notes || "").toLowerCase().includes(nameNeedle) ||
+        i.suitcaseId === bag!.id)
+  );
 
-  // Always top up personal basics if the joiner has few items (2nd, 3rd person, child, …)
-  if (alreadyOnBag < 8) {
+  // Top up personal basics only when this person still has few items
+  if (personalExisting.length < 8) {
+    const legs = trip.legs.map((leg) => ({
+      name: leg.name,
+      location: leg.location,
+      startDate: formatISO(startOfDay(leg.startDate), {
+        representation: "date",
+      }),
+      endDate: formatISO(startOfDay(leg.endDate), { representation: "date" }),
+      transport: leg.transport as
+        | "SHIP"
+        | "FLIGHT"
+        | "CAR"
+        | "TRAIN"
+        | "OTHER",
+      laundryAvailable: leg.laundryAvailable,
+      laundryIntervalDays: leg.laundryIntervalDays,
+      weatherTags: JSON.parse(leg.weatherTags) as WeatherTag[],
+      dressCodes: JSON.parse(leg.dressCodes) as DressCode[],
+    }));
     const noLaundryDays = daysWithoutLaundry(legs);
     const reserve = noLaundryDays >= 10 ? 2 : 1;
+
     const personal = personalItemsForTraveler(
       legs,
       {
@@ -461,20 +476,20 @@ export async function ensureMemberPackKit(tripId: string, userId: string) {
       },
       noLaundryDays,
       reserve
-    );
+    ).map((item) => ({
+      ...item,
+      notes: item.notes || `für ${person.name}`,
+      assigneeKey: userId,
+    }));
 
-    const existingNames = new Set(
-      (
-        await prisma.packItem.findMany({
-          where: { tripId, suitcaseId: bag.id },
-          select: { name: true },
-        })
-      ).map((i) => i.name.toLowerCase())
-    );
+    const existingForDedupe = personalExisting.map((i) => ({
+      name: i.name,
+      isShared: false,
+      notes: i.notes,
+      assigneeKey: userId,
+    }));
 
-    const toAdd = personal.filter(
-      (item) => !existingNames.has(item.name.toLowerCase())
-    );
+    const toAdd = filterNewPackItems(personal, existingForDedupe);
     if (toAdd.length > 0) {
       await prisma.packItem.createMany({
         data: toAdd.map((item) => ({
@@ -495,14 +510,17 @@ export async function ensureMemberPackKit(tripId: string, userId: string) {
   }
 }
 
-/** Ensure every current member has a personal suitcase + basics (any Nth joiner). */
-export async function ensureAllMembersPackKits(tripId: string) {
+/** Ensure every current member has a personal suitcase (+ optional basics). */
+export async function ensureAllMembersPackKits(
+  tripId: string,
+  opts?: { skipBasics?: boolean }
+) {
   const members = await prisma.tripMember.findMany({
     where: { tripId },
     select: { userId: true },
   });
   for (const m of members) {
-    await ensureMemberPackKit(tripId, m.userId);
+    await ensureMemberPackKit(tripId, m.userId, opts);
   }
 }
 
