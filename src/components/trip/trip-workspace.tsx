@@ -21,7 +21,7 @@ import { Label } from "@/components/ui/label";
 import { GenderPicker } from "@/components/ui/gender-picker";
 import { DatePicker } from "@/components/ui/date-picker";
 import { SwipeRow } from "@/components/ui/swipe-row";
-import { TravelMotif } from "@/components/app/travel-motif";
+import { TravelMotif, SuitcaseCardArt, ChecklistMotif } from "@/components/app/travel-motif";
 import {
   ParticipantFilter,
   sharedFilterOption,
@@ -126,7 +126,7 @@ type Trip = {
   }[];
 };
 
-type TripTab = "pack" | "ai" | "people";
+type TripTab = "pack" | "bags" | "ai" | "people";
 
 const TRANSPORT_LABELS: Record<string, string> = {
   SHIP: "Schiff",
@@ -281,7 +281,8 @@ function loadTab(tripId: string): TripTab {
   if (typeof window === "undefined") return "pack";
   try {
     const raw = localStorage.getItem(`flexipack_trip_tab_${tripId}`);
-    if (raw === "pack" || raw === "ai" || raw === "people") return raw;
+    if (raw === "pack" || raw === "bags" || raw === "ai" || raw === "people")
+      return raw;
   } catch {
     // ignore
   }
@@ -383,12 +384,21 @@ export function TripWorkspace({
               };
             }
             const exists = prev.items.some((i) => i.id === event.itemId);
+            const patch = {
+              ...event.payload,
+              packedAt:
+                event.payload.packedAt === undefined
+                  ? undefined
+                  : event.payload.packedAt
+                    ? String(event.payload.packedAt)
+                    : null,
+            };
             const items = exists
               ? prev.items.map((i) =>
-                  i.id === event.itemId ? { ...i, ...event.payload } : i
+                  i.id === event.itemId ? { ...i, ...patch } : i
                 )
               : event.payload.created
-                ? [...prev.items, event.payload]
+                ? [...prev.items, patch]
                 : prev.items;
             return { ...prev, items };
           });
@@ -537,8 +547,12 @@ export function TripWorkspace({
 
   const togglePacked = useCallback(
     async (item: PackItem) => {
-      if (!user) return;
+      if (!user?.id) return;
       const packed = !item.packedAt;
+      const prevPackedAt = item.packedAt;
+      const prevPackedBy = item.packedBy;
+      const prevPackedByUserId = item.packedByUserId;
+
       setTrip((prev) => ({
         ...prev,
         items: prev.items.map((i) =>
@@ -560,17 +574,48 @@ export function TripWorkspace({
         ),
       }));
 
-      await fetch(`/api/trips/${trip.id}/items`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          itemId: item.id,
-          packed,
-          userId: user.id,
-          userName: user.name,
-          userColor: user.color,
-        }),
-      });
+      try {
+        const res = await fetch(`/api/trips/${trip.id}/items`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          credentials: "same-origin",
+          body: JSON.stringify({
+            itemId: item.id,
+            packed,
+          }),
+        });
+        if (!res.ok) throw new Error("toggle failed");
+        const data = await res.json().catch(() => null);
+        if (data && typeof data.packedAt !== "undefined") {
+          setTrip((prev) => ({
+            ...prev,
+            items: prev.items.map((i) =>
+              i.id === item.id
+                ? {
+                    ...i,
+                    packedAt: data.packedAt,
+                    packedByUserId: data.packedByUserId ?? null,
+                    packedBy: data.packedBy ?? null,
+                  }
+                : i
+            ),
+          }));
+        }
+      } catch {
+        setTrip((prev) => ({
+          ...prev,
+          items: prev.items.map((i) =>
+            i.id === item.id
+              ? {
+                  ...i,
+                  packedAt: prevPackedAt,
+                  packedBy: prevPackedBy,
+                  packedByUserId: prevPackedByUserId,
+                }
+              : i
+          ),
+        }));
+      }
     },
     [trip.id, user]
   );
@@ -1043,18 +1088,34 @@ export function TripWorkspace({
           <div className="flex min-w-0 items-start gap-2">
             <button
               type="button"
-              onClick={() => togglePacked(item)}
+              data-no-swipe
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={(e) => {
+                e.stopPropagation();
+                void togglePacked(item);
+              }}
               className={cn(
-                "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border",
+                "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border",
                 item.packedAt
                   ? "border-teal-700 bg-teal-700 text-white"
                   : "border-stone-300/80 bg-white/70 text-transparent"
               )}
-              aria-label="Als gepackt markieren"
+              aria-label={
+                item.packedAt ? "Als offen markieren" : "Als gepackt markieren"
+              }
             >
               <Check className="h-4 w-4" />
             </button>
-            <div className="min-w-0 flex-1">
+            <button
+              type="button"
+              data-no-swipe
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={(e) => {
+                e.stopPropagation();
+                void togglePacked(item);
+              }}
+              className="min-w-0 flex-1 text-left"
+            >
               <div className="font-medium text-stone-900">
                 {item.quantity}× {item.name}
                 {pLabel && (
@@ -1083,10 +1144,12 @@ export function TripWorkspace({
                   </span>
                 )}
               </div>
-            </div>
+            </button>
           </div>
           <div className="flex items-end gap-2">
             <select
+              data-no-swipe
+              onPointerDown={(e) => e.stopPropagation()}
               className="min-w-0 flex-1 rounded-lg border border-stone-200/80 bg-white/80 px-2 py-1.5 text-xs"
               value={item.suitcaseId || ""}
               onChange={(e) => moveSuitcase(item.id, e.target.value)}
@@ -1173,6 +1236,7 @@ export function TripWorkspace({
 
   const tabs: { id: TripTab; label: string; icon: typeof ListChecks }[] = [
     { id: "pack", label: "Pack", icon: ListChecks },
+    { id: "bags", label: "Koffer", icon: Luggage },
     { id: "ai", label: "Tipps", icon: Sparkles },
     { id: "people", label: "Team", icon: Users },
   ];
@@ -1483,6 +1547,157 @@ export function TripWorkspace({
             {byCategory.map(([category, items]) =>
               renderSection(category, category, items, { icon: "briefcase" })
             )}
+          </div>
+        </section>
+      )}
+
+      {activeTab === "bags" && (
+        <section className="space-y-4">
+          <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-teal-900 via-teal-800 to-teal-700 px-4 py-5 text-teal-50 shadow-md">
+            <SuitcaseCardArt className="absolute -right-2 -top-1 h-24 w-36 opacity-50" />
+            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-teal-100/80">
+              Übersicht
+            </p>
+            <h2 className="mt-1 font-display text-2xl">Was liegt wo?</h2>
+            <p className="mt-1 max-w-[16rem] text-sm text-teal-50/85">
+              Pro Koffer gepackt vs. offen — tippe einen Koffer für die Liste.
+            </p>
+          </div>
+
+          <div className="flex justify-end">
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={addSuitcase}
+            >
+              Koffer hinzufügen
+            </Button>
+          </div>
+
+          <div className="space-y-3">
+            {trip.suitcases.map((s, idx) => {
+              const bagItems = trip.items.filter((i) => i.suitcaseId === s.id);
+              const packed = bagItems.filter((i) => i.packedAt).length;
+              const open = bagItems.length - packed;
+              const pct =
+                bagItems.length === 0
+                  ? 0
+                  : Math.round((packed / bagItems.length) * 100);
+              const openKey = `bag-${s.id}`;
+              const expanded = isSectionOpen(openKey);
+              const accent = s.isShared
+                ? "#B45309"
+                : s.owner?.color || "#0F766E";
+              return (
+                <div
+                  key={s.id}
+                  className="overflow-hidden rounded-2xl border border-stone-200/80 bg-white/80 shadow-sm"
+                >
+                  <button
+                    type="button"
+                    onClick={() => toggleSection(openKey)}
+                    className="flex w-full items-center gap-3 p-3 text-left"
+                  >
+                    <SuitcaseCardArt
+                      className="h-14 w-20 shrink-0"
+                      accent={accent}
+                    />
+                    <div className="min-w-0 flex-1">
+                      <div className="font-display text-lg text-stone-900">
+                        {s.name}
+                      </div>
+                      <div className="text-xs text-stone-500">
+                        {SUITCASE_SIZES.find((x) => x.id === s.size)?.label ||
+                          s.size}
+                        {s.isShared
+                          ? " · Gemeinsam"
+                          : s.owner
+                            ? ` · ${s.owner.name}`
+                            : ""}
+                        {" · "}
+                        {packed}/{bagItems.length} gepackt
+                      </div>
+                      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-stone-200">
+                        <div
+                          className="h-full rounded-full transition-all"
+                          style={{
+                            width: `${pct}%`,
+                            background: accent,
+                          }}
+                        />
+                      </div>
+                    </div>
+                    {expanded ? (
+                      <ChevronDown className="h-4 w-4 text-stone-400" />
+                    ) : (
+                      <ChevronRight className="h-4 w-4 text-stone-400" />
+                    )}
+                  </button>
+                  {expanded && (
+                    <div className="border-t border-stone-100 px-3 pb-3 pt-2">
+                      {bagItems.length === 0 ? (
+                        <div className="py-4 text-center">
+                          <ChecklistMotif className="mx-auto h-16 w-24 opacity-80" />
+                          <p className="mt-1 text-sm text-stone-500">
+                            Noch leer — weise Items in der Packliste zu.
+                          </p>
+                        </div>
+                      ) : (
+                        <ul className="space-y-1.5">
+                          {bagItems
+                            .slice()
+                            .sort((a, b) => {
+                              if (Boolean(a.packedAt) !== Boolean(b.packedAt)) {
+                                return a.packedAt ? 1 : -1;
+                              }
+                              return a.name.localeCompare(b.name, "de");
+                            })
+                            .map((item) => (
+                              <li key={item.id}>
+                                <button
+                                  type="button"
+                                  onClick={() => void togglePacked(item)}
+                                  className={cn(
+                                    "flex w-full items-center gap-2 rounded-xl px-2 py-2 text-left text-sm",
+                                    item.packedAt
+                                      ? "bg-teal-50/70 text-stone-500 line-through"
+                                      : "bg-stone-50 text-stone-800"
+                                  )}
+                                >
+                                  <span
+                                    className={cn(
+                                      "flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border",
+                                      item.packedAt
+                                        ? "border-teal-700 bg-teal-700 text-white"
+                                        : "border-stone-300 bg-white text-transparent"
+                                    )}
+                                  >
+                                    <Check className="h-3.5 w-3.5" />
+                                  </span>
+                                  <span className="min-w-0 flex-1">
+                                    {item.quantity}× {item.name}
+                                    {open > 0 && !item.packedAt ? (
+                                      <span className="ml-1 text-[10px] font-semibold uppercase text-amber-800">
+                                        offen
+                                      </span>
+                                    ) : null}
+                                  </span>
+                                </button>
+                              </li>
+                            ))}
+                        </ul>
+                      )}
+                      {idx === 0 && bagItems.length > 0 && (
+                        <p className="mt-2 text-[11px] text-stone-400">
+                          Tippe eine Zeile, um gepackt/offen umzuschalten.
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </section>
       )}

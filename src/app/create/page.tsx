@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Suspense } from "react";
 import { CreateTripClient } from "@/components/wizard/create-trip-client";
+import { ChecklistMotif } from "@/components/app/travel-motif";
 import { Button } from "@/components/ui/button";
 
 export default function CreatePage() {
@@ -10,12 +11,17 @@ export default function CreatePage() {
         <Link href="/" className="text-sm font-semibold text-teal-800">
           ← Reisen
         </Link>
-        <h1 className="mt-2 font-display text-3xl text-stone-950">
-          Neue Reise
-        </h1>
-        <p className="mt-1 text-sm text-stone-600">
-          Assistent, KI-Freitext oder Vorlage — gleiche Mengenlogik.
-        </p>
+        <div className="mt-3 flex items-start gap-3">
+          <ChecklistMotif className="mt-1 h-16 w-24 shrink-0" />
+          <div>
+            <h1 className="font-display text-3xl text-stone-950">
+              Neue Reise
+            </h1>
+            <p className="mt-1 text-sm text-stone-600">
+              Assistent, KI-Freitext oder Vorlage — gleiche Mengenlogik.
+            </p>
+          </div>
+        </div>
         <div className="mt-3 flex flex-wrap gap-2">
           <Link href="/join">
             <Button variant="outline" size="sm">

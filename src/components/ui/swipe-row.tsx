@@ -10,9 +10,18 @@ export type SwipeAction = {
   tone?: "danger" | "neutral";
 };
 
+function isInteractiveTarget(target: EventTarget | null) {
+  if (!(target instanceof Element)) return false;
+  return Boolean(
+    target.closest(
+      "button, a, input, select, textarea, label, [role='button'], [data-no-swipe]"
+    )
+  );
+}
+
 /**
  * Swipe left to reveal actions. Works with touch and mouse drag.
- * Actions stay fully covered until the front panel slides.
+ * Clicks on buttons/selects are never captured so packing toggles keep working.
  */
 export function SwipeRow({
   children,
@@ -27,31 +36,48 @@ export function SwipeRow({
   const startX = useRef(0);
   const startY = useRef(0);
   const startOffset = useRef(0);
-  const mode = useRef<"none" | "h" | "v">("none");
+  const mode = useRef<"none" | "h" | "v" | "skip">("none");
+  const panelRef = useRef<HTMLDivElement | null>(null);
   const maxReveal = Math.min(72 * actions.length, 180);
   const open = offset < -4;
 
-  const endDrag = () => {
+  const endDrag = (e?: React.PointerEvent) => {
     if (mode.current === "h") {
       setOffset((o) => (o < -maxReveal / 2 ? -maxReveal : 0));
+    }
+    if (
+      e &&
+      panelRef.current?.hasPointerCapture(e.pointerId)
+    ) {
+      panelRef.current.releasePointerCapture(e.pointerId);
     }
     mode.current = "none";
   };
 
   const onPointerDown = (e: React.PointerEvent) => {
+    if (isInteractiveTarget(e.target)) {
+      mode.current = "skip";
+      return;
+    }
     mode.current = "none";
     startX.current = e.clientX;
     startY.current = e.clientY;
     startOffset.current = offset;
-    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
   };
 
   const onPointerMove = (e: React.PointerEvent) => {
+    if (mode.current === "skip") return;
     const dx = e.clientX - startX.current;
     const dy = e.clientY - startY.current;
     if (mode.current === "none") {
       if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
-      mode.current = Math.abs(dx) > Math.abs(dy) ? "h" : "v";
+      if (Math.abs(dx) > Math.abs(dy)) {
+        mode.current = "h";
+        panelRef.current?.setPointerCapture(e.pointerId);
+      } else {
+        mode.current = "v";
+        return;
+      }
     }
     if (mode.current !== "h") return;
     e.preventDefault();
@@ -87,7 +113,8 @@ export function SwipeRow({
         ))}
       </div>
       <div
-        className="relative z-10 w-full touch-pan-y bg-white transition-transform duration-150 ease-out"
+        ref={panelRef}
+        className="relative z-10 w-full touch-pan-y bg-transparent transition-transform duration-150 ease-out"
         style={{ transform: `translateX(${offset}px)` }}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}

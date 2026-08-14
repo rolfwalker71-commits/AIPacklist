@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { TravelMotif } from "@/components/app/travel-motif";
 
 function JoinForm() {
   const router = useRouter();
@@ -72,7 +73,8 @@ export default function JoinPage() {
       <p className="mt-2 text-sm text-stone-600">
         Code von der Trip-Besitzer:in — danach unter «Reisen».
       </p>
-      <div className="mt-8">
+      <TravelMotif className="mt-4 h-24 w-full max-w-xs opacity-80" />
+      <div className="mt-4">
         <Suspense fallback={<p className="text-sm text-stone-500">Laden…</p>}>
           <JoinForm />
         </Suspense>

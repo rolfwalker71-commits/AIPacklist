@@ -55,3 +55,53 @@ export function SuitcaseMark({ className = "" }: { className?: string }) {
     </svg>
   );
 }
+
+/** Compact suitcase for bag overview cards */
+export function SuitcaseCardArt({
+  className = "",
+  accent = "#0F766E",
+}: {
+  className?: string;
+  accent?: string;
+}) {
+  return (
+    <svg viewBox="0 0 120 88" className={className} aria-hidden fill="none">
+      <path
+        d="M8 70 C28 40, 52 34, 78 48 S 108 72, 114 58"
+        stroke={accent}
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeDasharray="4 6"
+        opacity="0.35"
+      />
+      <rect x="28" y="28" width="56" height="40" rx="8" fill={accent} />
+      <rect x="46" y="20" width="20" height="10" rx="3" fill="#134E4A" />
+      <rect
+        x="38"
+        y="40"
+        width="36"
+        height="6"
+        rx="2"
+        fill="#CCFBF1"
+        opacity="0.55"
+      />
+      <circle cx="40" cy="72" r="5" fill="#1C1917" />
+      <circle cx="72" cy="72" r="5" fill="#1C1917" />
+      <circle cx="96" cy="24" r="8" fill="#FBBF24" opacity="0.85" />
+    </svg>
+  );
+}
+
+export function ChecklistMotif({ className = "" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 120 88" className={className} aria-hidden fill="none">
+      <rect x="22" y="14" width="76" height="60" rx="10" fill="#FFF" stroke="#D6D3D1" />
+      <rect x="34" y="28" width="10" height="10" rx="3" fill="#0F766E" />
+      <path d="M36 33 l3 3 5-6" stroke="#FFF" strokeWidth="1.6" strokeLinecap="round" />
+      <rect x="50" y="30" width="36" height="5" rx="2" fill="#D6D3D1" />
+      <rect x="34" y="46" width="10" height="10" rx="3" fill="#CCFBF1" stroke="#0F766E" />
+      <rect x="50" y="48" width="30" height="5" rx="2" fill="#E7E5E4" />
+      <circle cx="98" cy="22" r="7" fill="#B45309" opacity="0.8" />
+    </svg>
+  );
+}
