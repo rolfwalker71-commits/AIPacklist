@@ -1269,8 +1269,10 @@ export function TripWorkspace({
                 {label}
               </button>
             ))}
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
             <select
-              className="ml-auto rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm"
+              className="rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm"
               value={suitcaseFilter}
               onChange={(e) => setSuitcaseFilter(e.target.value)}
             >
