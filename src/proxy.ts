@@ -13,19 +13,35 @@ export function proxy(request: NextRequest) {
     pathname.startsWith("/_next") ||
     pathname.startsWith("/favicon") ||
     pathname.startsWith("/icons") ||
-    pathname === "/manifest.webmanifest"
+    pathname === "/manifest.webmanifest" ||
+    pathname === "/sw.js"
   ) {
     return NextResponse.next();
   }
 
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set("x-pathname", pathname);
+
   const isPublic =
     pathname === "/login" ||
+    pathname === "/login.html" ||
     pathname.startsWith("/api/auth/login") ||
     pathname.startsWith("/api/auth/setup") ||
     pathname.startsWith("/api/auth/status");
 
+  if (pathname === "/login") {
+    const url = request.nextUrl.clone();
+    url.pathname = "/login.html";
+    // keep ?next= / ?error=
+    return NextResponse.rewrite(url, {
+      request: { headers: requestHeaders },
+    });
+  }
+
   if (isPublic) {
-    return NextResponse.next();
+    return NextResponse.next({
+      request: { headers: requestHeaders },
+    });
   }
 
   const token = request.cookies.get(SESSION_COOKIE)?.value;
@@ -34,12 +50,14 @@ export function proxy(request: NextRequest) {
       return NextResponse.json({ error: "Nicht angemeldet" }, { status: 401 });
     }
     const url = request.nextUrl.clone();
-    url.pathname = "/login";
+    url.pathname = "/login.html";
     url.searchParams.set("next", pathname);
     return NextResponse.redirect(url);
   }
 
-  return NextResponse.next();
+  return NextResponse.next({
+    request: { headers: requestHeaders },
+  });
 }
 
 export const config = {

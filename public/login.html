@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="de-CH">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#0F766E" />
+    <title>FlexiPack</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        min-height: 100dvh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 1.5rem;
+        font-family: "Segoe UI", Helvetica, Arial, sans-serif;
+        background: linear-gradient(165deg, #fffdf8 0%, #f3faf7 42%, #fbf7f0 100%);
+        color: #1c1917;
+      }
+      .card {
+        width: 100%;
+        max-width: 26rem;
+        border: 1px solid rgba(28, 25, 23, 0.08);
+        border-radius: 1rem;
+        background: #fff;
+        padding: 1.5rem;
+        box-shadow: 0 10px 30px rgba(28, 25, 23, 0.06);
+      }
+      .eyebrow {
+        margin: 0 0 1rem;
+        font-size: 0.7rem;
+        font-weight: 700;
+        letter-spacing: 0.2em;
+        text-transform: uppercase;
+        color: #0f766e;
+      }
+      h1 {
+        margin: 0;
+        font-size: 1.85rem;
+        letter-spacing: -0.03em;
+      }
+      .sub {
+        margin: 0.5rem 0 0;
+        color: #57534e;
+        font-size: 0.9rem;
+      }
+      label {
+        display: block;
+        margin: 1rem 0 0.35rem;
+        font-size: 0.7rem;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: #78716c;
+      }
+      input {
+        width: 100%;
+        height: 2.75rem;
+        border: 1px solid #d6d3d1;
+        border-radius: 0.75rem;
+        padding: 0 0.75rem;
+        font-size: 0.95rem;
+        background: #fff;
+      }
+      button {
+        margin-top: 1.25rem;
+        width: 100%;
+        height: 2.75rem;
+        border: 0;
+        border-radius: 0.75rem;
+        background: #0f766e;
+        color: #fff;
+        font-size: 0.95rem;
+        font-weight: 700;
+        cursor: pointer;
+      }
+      button:active {
+        background: #115e59;
+      }
+      .err {
+        margin-top: 0.85rem;
+        color: #be123c;
+        font-size: 0.9rem;
+        font-weight: 600;
+      }
+      .hint {
+        margin-top: 0.75rem;
+        font-size: 0.8rem;
+        color: #78716c;
+      }
+      .loading {
+        color: #78716c;
+        font-size: 0.9rem;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <p class="eyebrow">FlexiPack</p>
+      <div id="root" class="loading">Laden…</div>
+    </div>
+    <script>
+      (function () {
+        var params = new URLSearchParams(location.search);
+        var next = params.get("next") || "/";
+        if (!(next.charAt(0) === "/" && next.charAt(1) !== "/")) next = "/";
+        var errMap = {
+          missing: "Angaben unvollständig oder ungültig.",
+          auth: "Anmeldung fehlgeschlagen.",
+          server: "Serverfehler.",
+        };
+        var err = params.get("error");
+        var errHtml = err
+          ? '<p class="err">' + (errMap[err] || "Fehler") + "</p>"
+          : "";
+
+        function field(id, name, label, opts) {
+          opts = opts || {};
+          return (
+            '<label for="' +
+            id +
+            '">' +
+            label +
+            "</label>" +
+            '<input id="' +
+            id +
+            '" name="' +
+            name +
+            '"' +
+            (opts.type ? ' type="' + opts.type + '"' : "") +
+            (opts.autocomplete ? ' autocomplete="' + opts.autocomplete + '"' : "") +
+            (opts.value ? ' value="' + opts.value + '"' : "") +
+            (opts.placeholder ? ' placeholder="' + opts.placeholder + '"' : "") +
+            (opts.minlength ? ' minlength="' + opts.minlength + '"' : "") +
+            " required />"
+          );
+        }
+
+        fetch("/api/auth/status")
+          .then(function (r) {
+            return r.json();
+          })
+          .then(function (d) {
+            var root = document.getElementById("root");
+            if (d.needsSetup) {
+              root.innerHTML =
+                "<h1>Admin einrichten</h1>" +
+                '<p class="sub">Frisch gestartet — lege den ersten Admin-Account an.</p>' +
+                '<form method="POST" action="/api/auth/setup">' +
+                '<input type="hidden" name="next" value="' +
+                next +
+                '" />' +
+                field("name", "name", "Anzeigename", {
+                  value: "Rolf",
+                  autocomplete: "name",
+                }) +
+                field("username", "username", "Benutzername", {
+                  value: "rolf",
+                  autocomplete: "username",
+                  placeholder: "nur a-z, 0-9",
+                }) +
+                field("password", "password", "Passwort", {
+                  type: "password",
+                  autocomplete: "new-password",
+                  minlength: "8",
+                }) +
+                errHtml +
+                '<button type="submit">Admin erstellen & starten</button>' +
+                '<p class="hint">Benutzername später zum Login verwenden (z.B. rolf).</p>' +
+                "</form>";
+            } else {
+              root.innerHTML =
+                "<h1>Anmelden</h1>" +
+                '<p class="sub">Mit Benutzername und Passwort.</p>' +
+                '<form method="POST" action="/api/auth/login">' +
+                '<input type="hidden" name="next" value="' +
+                next +
+                '" />' +
+                field("username", "username", "Benutzername", {
+                  autocomplete: "username",
+                  placeholder: "z.B. rolf",
+                }) +
+                field("password", "password", "Passwort", {
+                  type: "password",
+                  autocomplete: "current-password",
+                  minlength: "8",
+                }) +
+                errHtml +
+                '<button type="submit">Anmelden</button>' +
+                "</form>";
+            }
+          })
+          .catch(function () {
+            document.getElementById("root").innerHTML =
+              '<p class="err">Server nicht erreichbar.</p>';
+          });
+
+        if ("serviceWorker" in navigator) {
+          navigator.serviceWorker.getRegistrations().then(function (regs) {
+            regs.forEach(function (r) {
+              r.unregister();
+            });
+          });
+        }
+      })();
+    </script>
+  </body>
+</html>

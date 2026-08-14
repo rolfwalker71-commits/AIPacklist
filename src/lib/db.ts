@@ -9,11 +9,16 @@ function resolveDatabaseUrl() {
   if (
     url.startsWith("file:/") &&
     !url.startsWith("file://") &&
-    !url.startsWith("file:./")
+    !url.startsWith("file:./") &&
+    !url.startsWith("file:../")
   ) {
     return url;
   }
-  if (url.startsWith("file:./") || url.startsWith("file:data/")) {
+  if (
+    url.startsWith("file:./") ||
+    url.startsWith("file:../") ||
+    url.startsWith("file:data/")
+  ) {
     const abs = path.join(
       /*turbopackIgnore: true*/ process.cwd(),
       "data",

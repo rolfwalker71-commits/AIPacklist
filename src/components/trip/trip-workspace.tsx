@@ -21,6 +21,11 @@ import { Label } from "@/components/ui/label";
 import { GenderPicker } from "@/components/ui/gender-picker";
 import { DatePicker } from "@/components/ui/date-picker";
 import { SwipeRow } from "@/components/ui/swipe-row";
+import { TravelMotif } from "@/components/app/travel-motif";
+import {
+  ParticipantFilter,
+  sharedFilterOption,
+} from "@/components/trip/participant-filter";
 import { cn, formatDate } from "@/lib/utils";
 import type { PackGender, Transport } from "@/lib/types";
 import { SUITCASE_SIZES } from "@/lib/suitcases";
@@ -306,6 +311,11 @@ export function TripWorkspace({
   const [genderDraft, setGenderDraft] = useState<PackGender>(
     sessionUser.gender || "UNSPECIFIED"
   );
+  const [pendingAvatar, setPendingAvatar] = useState<File | null>(null);
+  const [avatarPreviewUrl, setAvatarPreviewUrl] = useState<string | null>(null);
+  const [avatarMessage, setAvatarMessage] = useState<string | null>(null);
+  const [profileBusy, setProfileBusy] = useState(false);
+  const [participantFilter, setParticipantFilter] = useState<string[]>([]);
   const [copied, setCopied] = useState(false);
   const [aiBusy, setAiBusy] = useState(false);
   const [aiMessage, setAiMessage] = useState<string | null>(null);
@@ -332,6 +342,16 @@ export function TripWorkspace({
     setOpenSections(loadOpenSections(trip.id));
     setActiveTab(loadTab(trip.id));
   }, [trip.id]);
+
+  useEffect(() => {
+    if (!pendingAvatar) {
+      setAvatarPreviewUrl(null);
+      return;
+    }
+    const url = URL.createObjectURL(pendingAvatar);
+    setAvatarPreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [pendingAvatar]);
 
   const setTab = (tab: TripTab) => {
     setActiveTab(tab);
@@ -390,15 +410,128 @@ export function TripWorkspace({
     return () => es.close();
   }, [trip.id]);
 
-  const saveName = () => {
-    if (!nameDraft.trim()) return;
-    const next = { ...user, name: nameDraft.trim(), gender: genderDraft };
-    setUser(next);
-    fetch(`/api/trips/${trip.id}/members`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ user: next }),
-    }).catch(() => undefined);
+  const saveProfile = async () => {
+    if (!nameDraft.trim() || profileBusy) return;
+    setProfileBusy(true);
+    setAvatarMessage(null);
+    try {
+      let avatarUrl = user.avatarUrl ?? null;
+
+      if (pendingAvatar) {
+        const body = new FormData();
+        body.append("file", pendingAvatar);
+        const res = await fetch("/api/avatars", { method: "POST", body });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          setAvatarMessage(
+            typeof data.error === "string"
+              ? data.error
+              : "Avatar konnte nicht hochgeladen werden"
+          );
+          return;
+        }
+        avatarUrl = data.avatarUrl ?? avatarUrl;
+      }
+
+      const next = {
+        ...user,
+        name: nameDraft.trim(),
+        gender: genderDraft,
+        avatarUrl,
+      };
+      setUser(next);
+
+      const memberRes = await fetch(`/api/trips/${trip.id}/members`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          user: {
+            name: next.name,
+            gender: next.gender,
+            avatarUrl: next.avatarUrl,
+          },
+        }),
+      });
+      if (!memberRes.ok) {
+        const data = await memberRes.json().catch(() => ({}));
+        setAvatarMessage(
+          typeof data.error === "string"
+            ? data.error
+            : "Profil konnte nicht gespeichert werden"
+        );
+        return;
+      }
+
+      const tripRes = await fetch(`/api/trips/${trip.id}`);
+      if (tripRes.ok) {
+        const tripData = await tripRes.json();
+        setTrip({
+          ...tripData,
+          aiInsights: normalizeInsights(tripData.aiInsights),
+        });
+      }
+
+      setPendingAvatar(null);
+      setAvatarMessage("Profil gespeichert");
+    } catch (e) {
+      setAvatarMessage(
+        e instanceof Error ? e.message : "Profil speichern fehlgeschlagen"
+      );
+    } finally {
+      setProfileBusy(false);
+    }
+  };
+
+  const removeAvatar = async () => {
+    if (profileBusy) return;
+    if (pendingAvatar && !user.avatarUrl) {
+      setPendingAvatar(null);
+      setAvatarMessage(null);
+      return;
+    }
+    setProfileBusy(true);
+    setAvatarMessage(null);
+    try {
+      const res = await fetch("/api/avatars", { method: "DELETE" });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setAvatarMessage(
+          typeof data.error === "string"
+            ? data.error
+            : "Avatar konnte nicht entfernt werden"
+        );
+        return;
+      }
+      const next = { ...user, avatarUrl: null };
+      setUser(next);
+      setPendingAvatar(null);
+      await fetch(`/api/trips/${trip.id}/members`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          user: {
+            name: nameDraft.trim() || next.name,
+            gender: genderDraft,
+            avatarUrl: null,
+          },
+        }),
+      });
+      const tripRes = await fetch(`/api/trips/${trip.id}`);
+      if (tripRes.ok) {
+        const tripData = await tripRes.json();
+        setTrip({
+          ...tripData,
+          aiInsights: normalizeInsights(tripData.aiInsights),
+        });
+      }
+      setAvatarMessage("Avatar entfernt");
+    } catch (e) {
+      setAvatarMessage(
+        e instanceof Error ? e.message : "Avatar entfernen fehlgeschlagen"
+      );
+    } finally {
+      setProfileBusy(false);
+    }
   };
 
   const togglePacked = useCallback(
@@ -687,6 +820,18 @@ export function TripWorkspace({
     }
   };
 
+  const participantOptions = useMemo(
+    () => [
+      ...trip.members.map((m) => ({
+        key: m.user.id,
+        label: m.user.name,
+        color: m.user.color,
+      })),
+      sharedFilterOption(),
+    ],
+    [trip.members]
+  );
+
   const filtered = useMemo(() => {
     return trip.items.filter((item) => {
       if (filter === "open" && item.packedAt) return false;
@@ -694,9 +839,15 @@ export function TripWorkspace({
       if (filter === "shared" && !item.isShared) return false;
       if (suitcaseFilter !== "all" && item.suitcaseId !== suitcaseFilter)
         return false;
+      if (participantFilter.length > 0) {
+        const owner = resolveItemOwner(item, trip);
+        const key =
+          owner.kind === "user" ? owner.user.id : "shared";
+        if (!participantFilter.includes(key)) return false;
+      }
       return true;
     });
-  }, [trip.items, filter, suitcaseFilter]);
+  }, [trip.items, filter, suitcaseFilter, participantFilter, trip]);
 
   const sortItems = (a: PackItem, b: PackItem) => {
     const pa = priorityRank(resolvePriority(a));
@@ -800,6 +951,66 @@ export function TripWorkspace({
     return memberUserId === user.id;
   };
 
+  const avatarPeopleForItem = (item: PackItem): MemberUser[] => {
+    const owner = resolveItemOwner(item, trip);
+    if (owner.kind === "shared" || item.isShared) {
+      return trip.members.map((m) => m.user);
+    }
+    if (owner.kind === "user") return [owner.user];
+    return [];
+  };
+
+  const renderAvatarStack = (people: MemberUser[], shared: boolean) => {
+    if (people.length === 0) return null;
+    const shown = people.slice(0, 4);
+    const extra = people.length - shown.length;
+    return (
+      <div
+        className="flex shrink-0 items-center justify-end pl-2"
+        title={
+          shared
+            ? `Gemeinsam: ${people.map((p) => p.name).join(", ")}`
+            : people[0]?.name
+        }
+      >
+        <div className="flex items-center">
+          {shown.map((person, i) => (
+            <span
+              key={person.id}
+              className="relative inline-flex h-7 w-7 items-center justify-center overflow-hidden rounded-full ring-2 ring-white"
+              style={{
+                marginLeft: i === 0 ? 0 : -8,
+                zIndex: shown.length - i,
+                background: person.color,
+              }}
+            >
+              {person.avatarUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={person.avatarUrl}
+                  alt=""
+                  className="h-full w-full object-cover"
+                />
+              ) : (
+                <span className="text-[10px] font-bold text-white">
+                  {person.name.slice(0, 1).toUpperCase()}
+                </span>
+              )}
+            </span>
+          ))}
+          {extra > 0 && (
+            <span
+              className="relative inline-flex h-7 w-7 items-center justify-center rounded-full bg-stone-700 text-[10px] font-bold text-white ring-2 ring-white"
+              style={{ marginLeft: -8, zIndex: 0 }}
+            >
+              +{extra}
+            </span>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   const renderItem = (item: PackItem) => {
     const owner = resolveItemOwner(item, trip);
     const color =
@@ -808,8 +1019,7 @@ export function TripWorkspace({
         : owner.kind === "user"
           ? owner.user.color
           : "#78716c";
-    const avatarUrl =
-      owner.kind === "user" ? owner.user.avatarUrl : null;
+    const people = avatarPeopleForItem(item);
     const priority = resolvePriority(item);
     const pLabel = priorityLabel(priority);
 
@@ -826,18 +1036,10 @@ export function TripWorkspace({
         ]}
       >
         <li
-          className="flex list-none flex-col gap-2 rounded-xl border px-3 py-3 transition sm:flex-row sm:items-center"
+          className="flex list-none flex-col gap-2 rounded-xl border px-3 py-3 transition"
           style={tileStyle(color, Boolean(item.packedAt))}
         >
-          <div className="flex min-w-0 flex-1 items-start gap-2 sm:items-center">
-            {avatarUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={avatarUrl}
-                alt=""
-                className="mt-0.5 h-6 w-6 shrink-0 rounded-full object-cover ring-1 ring-black/5 sm:mt-0"
-              />
-            ) : null}
+          <div className="flex min-w-0 items-start gap-2">
             <button
               type="button"
               onClick={() => togglePacked(item)}
@@ -882,9 +1084,9 @@ export function TripWorkspace({
               </div>
             </div>
           </div>
-          <div className="flex items-center gap-1.5 sm:ml-auto">
+          <div className="flex items-end gap-2">
             <select
-              className="rounded-lg border border-stone-200/80 bg-white/80 px-2 py-1.5 text-xs"
+              className="min-w-0 flex-1 rounded-lg border border-stone-200/80 bg-white/80 px-2 py-1.5 text-xs"
               value={item.suitcaseId || ""}
               onChange={(e) => moveSuitcase(item.id, e.target.value)}
             >
@@ -895,6 +1097,7 @@ export function TripWorkspace({
                 </option>
               ))}
             </select>
+            {renderAvatarStack(people, item.isShared || owner.kind === "shared")}
           </div>
         </li>
       </SwipeRow>
@@ -968,14 +1171,16 @@ export function TripWorkspace({
   };
 
   const tabs: { id: TripTab; label: string; icon: typeof ListChecks }[] = [
-    { id: "pack", label: "Packliste", icon: ListChecks },
-    { id: "ai", label: "AI Infos", icon: Sparkles },
-    { id: "people", label: "Benutzer / Koffer", icon: Users },
+    { id: "pack", label: "Pack", icon: ListChecks },
+    { id: "ai", label: "Tipps", icon: Sparkles },
+    { id: "people", label: "Team", icon: Users },
   ];
 
+  const displayAvatarUrl = avatarPreviewUrl || user.avatarUrl || null;
+
   return (
-    <div className="space-y-6">
-      <header className="space-y-4">
+    <div className="space-y-6 pb-28">
+      <header className="space-y-4 rounded-2xl border border-stone-200/80 bg-white/70 p-4 shadow-sm backdrop-blur-sm md:p-5">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-amber-800">
@@ -1037,29 +1242,6 @@ export function TripWorkspace({
             {aiMessage}
           </p>
         )}
-
-        <nav className="flex flex-wrap gap-2" aria-label="Reise-Bereiche">
-          {tabs.map((tab) => {
-            const Icon = tab.icon;
-            const active = activeTab === tab.id;
-            return (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => setTab(tab.id)}
-                className={cn(
-                  "inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-semibold transition",
-                  active
-                    ? "border-teal-800 bg-teal-800 text-white"
-                    : "border-stone-200 bg-white text-stone-600 hover:border-stone-300"
-                )}
-              >
-                <Icon className="h-4 w-4" />
-                {tab.label}
-              </button>
-            );
-          })}
-        </nav>
       </header>
 
       {activeTab === "pack" && (
@@ -1110,6 +1292,12 @@ export function TripWorkspace({
               {aiBusy ? "KI…" : "KI"}
             </Button>
           </div>
+
+          <ParticipantFilter
+            options={participantOptions}
+            selected={participantFilter}
+            onChange={setParticipantFilter}
+          />
 
           <div className="space-y-2">
             <h3 className="font-display text-lg text-stone-900">Etappen</h3>
@@ -1315,6 +1503,7 @@ export function TripWorkspace({
 
           {!hasInsights ? (
             <div className="rounded-2xl border border-dashed border-stone-300 bg-stone-50/60 px-4 py-8 text-center">
+              <TravelMotif className="mx-auto mb-4 h-28 w-auto max-w-[240px]" />
               <p className="font-medium text-stone-800">
                 Noch keine AI-Infos gespeichert
               </p>
@@ -1374,57 +1563,84 @@ export function TripWorkspace({
             <div className="space-y-3">
               <div>
                 <Label>Dein Name</Label>
-                <div className="flex gap-2">
-                  <Input
-                    value={nameDraft}
-                    onChange={(e) => setNameDraft(e.target.value)}
-                  />
-                  <Button variant="secondary" onClick={saveName}>
-                    Speichern
-                  </Button>
-                </div>
+                <Input
+                  value={nameDraft}
+                  onChange={(e) => setNameDraft(e.target.value)}
+                />
               </div>
               <GenderPicker value={genderDraft} onChange={setGenderDraft} />
               <div>
                 <Label>Avatar (freiwillig)</Label>
-                <input
-                  type="file"
-                  accept="image/*"
-                  className="block w-full text-xs text-stone-600 file:mr-3 file:rounded-lg file:border-0 file:bg-teal-800 file:px-3 file:py-2 file:text-xs file:font-semibold file:text-white"
-                  onChange={async (e) => {
-                    const file = e.target.files?.[0];
-                    if (!file || !user) return;
-                    const body = new FormData();
-                    body.append("file", file);
-                    body.append("userId", user.id);
-                    body.append("userName", nameDraft || user.name);
-                    body.append("userColor", user.color);
-                    const res = await fetch("/api/avatars", {
-                      method: "POST",
-                      body,
-                    });
-                    if (!res.ok) return;
-                    const data = await res.json();
-                    const next = { ...user, avatarUrl: data.avatarUrl };
-                    setUser(next);
-                    await fetch(`/api/trips/${trip.id}/members`, {
-                      method: "POST",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({
-                        user: next,
-                      }),
-                    });
-                    const tripRes = await fetch(`/api/trips/${trip.id}`);
-                    if (tripRes.ok) {
-                      const tripData = await tripRes.json();
-                      setTrip({
-                        ...tripData,
-                        aiInsights: normalizeInsights(tripData.aiInsights),
-                      });
-                    }
-                  }}
-                />
+                <div className="mt-2 flex items-center gap-3">
+                  {displayAvatarUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={displayAvatarUrl}
+                      alt=""
+                      className="h-14 w-14 rounded-full object-cover ring-1 ring-black/5"
+                    />
+                  ) : (
+                    <span
+                      className="flex h-14 w-14 items-center justify-center rounded-full text-sm font-semibold text-white"
+                      style={{ background: user.color }}
+                    >
+                      {(nameDraft || user.name).slice(0, 1).toUpperCase()}
+                    </span>
+                  )}
+                  <div className="min-w-0 flex-1 space-y-2">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="block w-full text-xs text-stone-600 file:mr-3 file:rounded-lg file:border-0 file:bg-teal-800 file:px-3 file:py-2 file:text-xs file:font-semibold file:text-white"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0] ?? null;
+                        setPendingAvatar(file);
+                        setAvatarMessage(
+                          file
+                            ? "Bild gewählt — tippe Speichern, damit es bleibt."
+                            : null
+                        );
+                        e.target.value = "";
+                      }}
+                    />
+                    {(displayAvatarUrl || pendingAvatar) && (
+                      <button
+                        type="button"
+                        onClick={removeAvatar}
+                        disabled={profileBusy}
+                        className="text-xs font-medium text-rose-700 hover:underline disabled:opacity-50"
+                      >
+                        Avatar entfernen
+                      </button>
+                    )}
+                  </div>
+                </div>
               </div>
+              {avatarMessage && (
+                <p
+                  className={`text-sm font-medium ${
+                    avatarMessage === "Profil gespeichert"
+                      ? "text-teal-800"
+                      : avatarMessage.includes("gewählt")
+                        ? "text-amber-800"
+                        : "text-rose-700"
+                  }`}
+                >
+                  {avatarMessage}
+                </p>
+              )}
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => void saveProfile()}
+                disabled={profileBusy || !nameDraft.trim()}
+              >
+                {profileBusy ? "Speichern…" : "Speichern"}
+              </Button>
+              <p className="text-[11px] text-stone-500">
+                Profil inkl. Avatar kannst du auch unter «Profil» in der
+                unteren Navigation speichern.
+              </p>
             </div>
             <div>
               <Label className="flex items-center gap-1">
@@ -1631,6 +1847,44 @@ export function TripWorkspace({
           </div>
         </section>
       )}
+
+      <nav
+        className="fixed inset-x-0 bottom-0 z-40 border-t border-teal-900/10 bg-[#FBF7F0]/95 backdrop-blur-md"
+        style={{ paddingBottom: "max(0.5rem, env(safe-area-inset-bottom))" }}
+        aria-label="Reise-Bereiche"
+      >
+        <div className="mx-auto flex max-w-lg items-stretch justify-around px-2 pt-1.5">
+          {tabs.map((tab) => {
+            const Icon = tab.icon;
+            const active = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setTab(tab.id)}
+                className={cn(
+                  "flex min-w-[4.5rem] flex-col items-center gap-0.5 rounded-xl px-3 py-2 text-[11px] font-semibold transition",
+                  active
+                    ? "text-teal-800"
+                    : "text-stone-500 hover:text-stone-800"
+                )}
+              >
+                <span
+                  className={cn(
+                    "flex h-9 w-9 items-center justify-center rounded-2xl transition",
+                    active
+                      ? "bg-teal-800 text-white shadow-md shadow-teal-900/20"
+                      : "bg-transparent"
+                  )}
+                >
+                  <Icon className="h-5 w-5" />
+                </span>
+                {tab.label}
+              </button>
+            );
+          })}
+        </div>
+      </nav>
     </div>
   );
 }

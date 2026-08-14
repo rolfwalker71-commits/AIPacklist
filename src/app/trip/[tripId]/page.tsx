@@ -28,11 +28,11 @@ export default async function TripPage({
   if (!trip) notFound();
 
   return (
-    <main className="mx-auto max-w-5xl px-4 pb-20 pt-8">
+    <main className="mx-auto max-w-lg px-4 pb-6 pt-4 md:max-w-3xl md:pt-6">
       <Link href="/" className="text-sm font-semibold text-teal-800">
-        ← FlexiPack
+        ← Reisen
       </Link>
-      <div className="mt-4">
+      <div className="mt-3">
         <TripWorkspace
           initialTrip={serializeTrip(trip)}
           sessionUser={{

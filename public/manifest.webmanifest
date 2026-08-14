@@ -5,8 +5,10 @@
   "lang": "de-CH",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#F7F3EB",
+  "background_color": "#FBF7F0",
   "theme_color": "#0F766E",
+  "categories": ["travel", "lifestyle"],
+  "id": "/",
   "orientation": "any",
   "icons": [
     {

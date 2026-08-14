@@ -62,15 +62,15 @@ function JoinForm() {
 
 export default function JoinPage() {
   return (
-    <main className="mx-auto max-w-3xl px-4 pb-20 pt-8">
+    <main className="mx-auto max-w-lg px-4 pb-8 pt-6 md:max-w-3xl">
       <Link href="/" className="text-sm font-semibold text-teal-800">
-        ← FlexiPack
+        ← Reisen
       </Link>
       <h1 className="mt-4 font-display text-3xl text-stone-950">
         Reise beitreten
       </h1>
-      <p className="mt-2 text-stone-600">
-        Mit Einladungscode einer bestehenden Packliste beitreten.
+      <p className="mt-2 text-sm text-stone-600">
+        Code von der Trip-Besitzer:in — danach unter «Reisen».
       </p>
       <div className="mt-8">
         <Suspense fallback={<p className="text-sm text-stone-500">Laden…</p>}>
