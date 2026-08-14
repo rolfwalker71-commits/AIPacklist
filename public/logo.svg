@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" fill="none" role="img" aria-label="FlexiPack">
+  <defs>
+    <clipPath id="case">
+      <rect x="20" y="28" width="88" height="84" rx="18"/>
+    </clipPath>
+  </defs>
+  <!-- Handle loop -->
+  <path d="M50 30 V20 a14 14 0 0 1 28 0 v10" stroke="#0B5F59" stroke-width="8" stroke-linecap="round"/>
+  <!-- Suitcase: lighter sides, darker center -->
+  <g clip-path="url(#case)">
+    <rect x="20" y="28" width="88" height="84" fill="#14958C"/>
+    <rect x="48" y="28" width="32" height="84" fill="#0F766E"/>
+    <rect x="20" y="80" width="88" height="16" fill="#F59E0B"/>
+  </g>
+  <!-- Buckle: orange frame, teal core -->
+  <rect x="55" y="75" width="18" height="26" rx="3" fill="#F59E0B"/>
+  <rect x="59" y="79" width="10" height="18" rx="2" fill="#0F766E"/>
+  <!-- Feet -->
+  <rect x="30" y="108" width="10" height="8" rx="2" fill="#0B5F59"/>
+  <rect x="88" y="108" width="10" height="8" rx="2" fill="#0B5F59"/>
+  <!-- Two-tone check -->
+  <path d="M40 84 L56 100" stroke="#FFFFFF" stroke-width="12" stroke-linecap="round"/>
+  <path d="M56 100 L94 56" stroke="#F59E0B" stroke-width="12" stroke-linecap="round"/>
+</svg>

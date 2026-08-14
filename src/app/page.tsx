@@ -7,6 +7,7 @@ import { formatDate } from "@/lib/utils";
 import { getSessionUser } from "@/lib/auth";
 import { tripsForUserWhere } from "@/lib/trip-access";
 import { TravelMotif } from "@/components/app/travel-motif";
+import { BrandLogo } from "@/components/app/brand-logo";
 
 export const dynamic = "force-dynamic";
 
@@ -24,13 +25,16 @@ export default async function HomePage() {
   return (
     <main className="mx-auto max-w-lg px-4 pb-6 pt-6 md:max-w-3xl md:pt-10">
       <header className="mb-6 flex items-center justify-between animate-rise">
-        <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-teal-800/80">
-            FlexiPack
-          </p>
-          <h1 className="font-display text-2xl text-stone-950 md:text-3xl">
-            Hallo {user.name.split(" ")[0]}
-          </h1>
+        <div className="flex items-center gap-3">
+          <BrandLogo className="h-11 w-11 shrink-0" />
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-teal-800/80">
+              FlexiPack
+            </p>
+            <h1 className="font-display text-2xl text-stone-950 md:text-3xl">
+              Hallo {user.name.split(" ")[0]}
+            </h1>
+          </div>
         </div>
         {user.role === "ADMIN" && (
           <Link href="/admin/users">

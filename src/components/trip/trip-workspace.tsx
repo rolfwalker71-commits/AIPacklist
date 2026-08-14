@@ -22,6 +22,7 @@ import { GenderPicker } from "@/components/ui/gender-picker";
 import { DatePicker } from "@/components/ui/date-picker";
 import { SwipeRow } from "@/components/ui/swipe-row";
 import { TravelMotif, SuitcaseCardArt, ChecklistMotif } from "@/components/app/travel-motif";
+import { BrandLogo } from "@/components/app/brand-logo";
 import {
   ParticipantFilter,
   sharedFilterOption,
@@ -1248,9 +1249,12 @@ export function TripWorkspace({
       <header className="space-y-4 rounded-2xl border border-stone-200/80 bg-white/70 p-4 shadow-sm backdrop-blur-sm md:p-5">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-amber-800">
-              FlexiPack-Reise
-            </p>
+            <div className="mb-1 flex items-center gap-2">
+              <BrandLogo className="h-7 w-7 shrink-0" />
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-amber-800">
+                FlexiPack-Reise
+              </p>
+            </div>
             <h1 className="font-display text-3xl text-stone-950 md:text-4xl">
               {trip.title}
             </h1>

@@ -1,3 +1,4 @@
+import { BrandLogo } from "@/components/app/brand-logo";
 import { needsSetup } from "@/lib/auth";
 import { loginAction, setupAction } from "./actions";
 
@@ -30,9 +31,12 @@ export default async function LoginPage({
   return (
     <main className="mx-auto flex min-h-[100dvh] max-w-md items-center px-4 py-12">
       <div className="w-full rounded-2xl border border-stone-200 bg-white p-6 shadow-sm">
-        <p className="mb-4 text-xs font-semibold uppercase tracking-[0.2em] text-teal-800">
-          FlexiPack
-        </p>
+        <div className="mb-4 flex items-center gap-3">
+          <BrandLogo className="h-11 w-11 shrink-0" />
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-teal-800">
+            FlexiPack
+          </p>
+        </div>
 
         {setup ? (
           <form action={setupAction} className="space-y-4">

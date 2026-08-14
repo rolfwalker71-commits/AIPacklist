@@ -23,6 +23,13 @@ export const metadata: Metadata = {
     statusBarStyle: "default",
     title: "FlexiPack",
   },
+  icons: {
+    icon: [
+      { url: "/favicon.png", sizes: "32x32", type: "image/png" },
+      { url: "/logo.svg", type: "image/svg+xml" },
+    ],
+    apple: [{ url: "/icons/apple-touch-icon.png", sizes: "180x180" }],
+  },
   other: {
     "mobile-web-app-capable": "yes",
   },

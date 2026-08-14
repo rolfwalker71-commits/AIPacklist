@@ -13,6 +13,9 @@ export function proxy(request: NextRequest) {
     pathname.startsWith("/_next") ||
     pathname.startsWith("/favicon") ||
     pathname.startsWith("/icons") ||
+    pathname.startsWith("/logo") ||
+    pathname.startsWith("/icon") ||
+    pathname.startsWith("/apple-icon") ||
     pathname === "/manifest.webmanifest" ||
     pathname === "/sw.js"
   ) {
