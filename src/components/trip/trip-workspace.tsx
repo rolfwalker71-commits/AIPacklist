@@ -18,9 +18,11 @@ import {
   X,
   Printer,
   CloudSun,
+  Trash2,
   Layers2,
 } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -345,6 +347,7 @@ export function TripWorkspace({
   initialTrip: Trip;
   sessionUser: SessionUserProp;
 }) {
+  const router = useRouter();
   const [trip, setTrip] = useState<Trip>(() => ({
     ...initialTrip,
     aiInsights: normalizeInsights(initialTrip.aiInsights),
@@ -1388,6 +1391,35 @@ export function TripWorkspace({
     trip.ownerId === user.id ||
     trip.members.some((m) => m.user.id === user.id && m.role === "OWNER") ||
     user.role === "ADMIN";
+
+  const removeTripOrLeave = async () => {
+    const ok = window.confirm(
+      isTripOwner
+        ? `Reise «${trip.title}» wirklich löschen? Das kann nicht rückgängig gemacht werden.`
+        : `Reise «${trip.title}» verlassen?`
+    );
+    if (!ok) return;
+    setAiMessage(null);
+    try {
+      const res = await fetch(`/api/trips/${trip.id}`, {
+        method: "DELETE",
+        credentials: "same-origin",
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setAiMessage(
+          typeof data.error === "string"
+            ? data.error
+            : "Löschen fehlgeschlagen"
+        );
+        return;
+      }
+      router.push("/");
+      router.refresh();
+    } catch (e) {
+      setAiMessage(e instanceof Error ? e.message : "Löschen fehlgeschlagen");
+    }
+  };
 
   const removeMember = async (memberUserId: string) => {
     const member = trip.members.find((m) => m.user.id === memberUserId);
@@ -3092,6 +3124,27 @@ export function TripWorkspace({
                 )}
               </div>
             </div>
+          </div>
+
+          <div className="rounded-2xl border border-rose-200 bg-rose-50/60 p-4">
+            <p className="text-sm font-semibold text-rose-950">
+              {isTripOwner ? "Reise löschen" : "Reise verlassen"}
+            </p>
+            <p className="mt-1 text-sm text-rose-900/80">
+              {isTripOwner
+                ? "Löscht die gesamte Packliste für alle Mitreisenden. Auf der Startseite geht das auch per Wisch nach links."
+                : "Du verschwindest aus der Gruppe; die Reise bleibt für die anderen bestehen."}
+            </p>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="mt-3 border-rose-300 text-rose-800 hover:bg-rose-100"
+              onClick={() => void removeTripOrLeave()}
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              {isTripOwner ? "Reise löschen" : "Verlassen"}
+            </Button>
           </div>
 
           <div className="space-y-3">

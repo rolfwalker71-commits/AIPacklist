@@ -1,7 +1,6 @@
 "use client";
 
-import { useState } from "react";
-import Link from "next/link";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { SwipeRow } from "@/components/ui/swipe-row";
 import { formatDate } from "@/lib/utils";
@@ -27,7 +26,16 @@ export function TripList({
   const [trips, setTrips] = useState(initial);
   const [busyId, setBusyId] = useState<string | null>(null);
 
+  useEffect(() => {
+    setTrips(initial);
+  }, [initial]);
+
+  const openTrip = (tripId: string) => {
+    router.push(`/trip/${tripId}`);
+  };
+
   const removeTrip = async (trip: TripListItem) => {
+    if (busyId) return;
     const isOwner = trip.ownerId === userId;
     const ok = window.confirm(
       isOwner
@@ -40,10 +48,15 @@ export function TripList({
     const prev = trips;
     setTrips((list) => list.filter((t) => t.id !== trip.id));
     try {
-      const res = await fetch(`/api/trips/${trip.id}`, { method: "DELETE" });
+      const res = await fetch(`/api/trips/${trip.id}`, {
+        method: "DELETE",
+        credentials: "same-origin",
+      });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || "Löschen fehlgeschlagen");
+        throw new Error(
+          typeof data.error === "string" ? data.error : "Löschen fehlgeschlagen"
+        );
       }
       router.refresh();
     } catch (e) {
@@ -54,29 +67,32 @@ export function TripList({
     }
   };
 
+  if (trips.length === 0) return null;
+
   return (
     <ul className="space-y-3">
       {trips.map((trip) => {
         const isOwner = trip.ownerId === userId;
         return (
-          <SwipeRow
-            key={trip.id}
-            actions={[
-              {
-                id: "remove",
-                label: isOwner ? "Löschen" : "Verlassen",
-                tone: "danger",
-                onClick: () => {
-                  if (busyId) return;
-                  void removeTrip(trip);
+          <li key={trip.id} className="list-none">
+            <SwipeRow
+              className="rounded-[1.25rem]"
+              actions={[
+                {
+                  id: "remove",
+                  label: isOwner ? "Löschen" : "Verlassen",
+                  tone: "danger",
+                  onClick: () => {
+                    void removeTrip(trip);
+                  },
                 },
-              },
-            ]}
-          >
-            <li className="list-none">
-              <Link
-                href={`/trip/${trip.id}`}
-                className="card-surface block bg-white p-4 transition hover:border-teal-300 hover:shadow-md"
+              ]}
+            >
+              <button
+                type="button"
+                disabled={busyId === trip.id}
+                onClick={() => openTrip(trip.id)}
+                className="card-surface block w-full select-none bg-white p-4 text-left transition hover:border-teal-300 hover:shadow-md disabled:opacity-60"
               >
                 <div className="font-display text-section-title text-stone-900">
                   {trip.title}
@@ -89,9 +105,9 @@ export function TripList({
                   {trip._count.members} Personen · Code {trip.inviteCode}
                   {!isOwner ? " · Beigetreten" : ""}
                 </div>
-              </Link>
-            </li>
-          </SwipeRow>
+              </button>
+            </SwipeRow>
+          </li>
         );
       })}
     </ul>

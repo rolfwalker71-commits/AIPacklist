@@ -84,10 +84,15 @@ export default async function HomePage() {
       </section>
 
       <section className="mt-8 animate-rise" style={{ animationDelay: "0.08s" }}>
-        <div className="mb-3 flex items-end justify-between">
-          <h2 className="font-display text-section-title text-stone-900">
-            Reisen
-          </h2>
+        <div className="mb-3 flex items-end justify-between gap-3">
+          <div>
+            <h2 className="font-display text-section-title text-stone-900">
+              Reisen
+            </h2>
+            <p className="mt-0.5 text-sm text-stone-500">
+              Nach links wischen zum Löschen
+            </p>
+          </div>
           <Link href="/create" className="text-sm font-semibold text-teal-800">
             Neu
           </Link>
