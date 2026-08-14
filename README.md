@@ -53,6 +53,24 @@ OPENAI_MODEL=gpt-4.1-mini
 
 In Docker: Env in `docker-compose.yml` / `.env`, oder Key in der Settings-UI (landet in Volume `/app/data/ai-settings.json`).
 
+### Web Push (VAPID)
+
+In der Host-`.env` (neben `docker-compose.yml`):
+
+```env
+VAPID_PUBLIC_KEY=...
+VAPID_PRIVATE_KEY=...
+VAPID_SUBJECT=mailto:du@example.com
+```
+
+Keys erzeugen: `npx web-push generate-vapid-keys`. Danach Container neu starten:
+
+```bash
+docker compose up -d
+```
+
+Compose reicht `VAPID_*` in den Container durch. Ohne Keys zeigt der Team-Tab «Push ist nicht konfiguriert». Push braucht HTTPS (oder localhost); iOS: App zum Home-Bildschirm.
+
 AI-Features:
 - **Vibe Input** → Etappen-Parse per GPT (Fallback: Regelparser)
 - **Liste mit AI verfeinern** auf der Trip-Seite
