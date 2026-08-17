@@ -7,6 +7,10 @@ import {
   type PackPriority,
 } from "./priority";
 import { filterNewPackItems } from "./pack-dedupe";
+import {
+  expandPersonalItems,
+  isAlwaysPersonalItem,
+} from "./pack-ownership";
 import type { CalculatedItem, LegInput, TravelerProfile } from "./types";
 
 type AiPackResponse = {
@@ -47,30 +51,12 @@ const DESTINATION_RESEARCH = `Reiseziel-Recherche (sehr wichtig — location und
 - Kinder/weitere Personen: altersgerechte Items und Formalitäten mitdenken, wenn mehrere Reisende.
 Frühe Priorität (EARLY) für alles, was vor Abreise beantragt/geprüft werden muss.`;
 
-/** Hard safety net — never let these become "gemeinsam". */
-const ALWAYS_PERSONAL = [
-  "reisepass",
-  "ausweis",
-  "pass",
-  "esta",
-  "eta",
-  "visa",
-  "ticket",
-  "bordkarte",
-  "zahnbürste",
-  "zahnbuerste",
-  "powerbank",
-  "ladekabel",
-  "netzteil",
-  "handy-lad",
-  "medikament",
-  "bh",
-  "boxershort",
-];
-
-function forcePersonalIfNeeded(name: string, isShared: boolean): boolean {
-  const n = name.toLowerCase();
-  if (ALWAYS_PERSONAL.some((k) => n.includes(k))) return false;
+function forcePersonalIfNeeded(
+  name: string,
+  category: string,
+  isShared: boolean
+): boolean {
+  if (isAlwaysPersonalItem(name, category)) return false;
   return isShared;
 }
 
@@ -93,35 +79,17 @@ function mapAiItems(
 
   for (const i of raw || []) {
     if (!i?.name) continue;
-    const traveler = travelers.find(
-      (t) => t.name.toLowerCase() === String(i.forTraveler || "").toLowerCase()
-    );
-    let isShared = forcePersonalIfNeeded(i.name, Boolean(i.isShared));
     const name = String(i.name).slice(0, 80);
     const category = String(i.category || "Sonstiges").slice(0, 40);
     const quantity = Math.max(1, Number(i.quantity) || 1);
-
-    // Personal item without traveler → expand to every traveler
-    if (!isShared && !traveler && travelers.length > 0) {
-      for (const t of travelers) {
-        const notes = i.notes
-          ? `für ${t.name} · ${i.notes}`
-          : `für ${t.name} · KI`;
-        items.push({
-          name,
-          category,
-          quantity,
-          isShared: false,
-          notes,
-          source: "ai",
-          assigneeKey: t.key,
-          priority: itemPriority(name, category, notes, i.priority),
-          suggestedBag: i.suggestedBag ? String(i.suggestedBag) : null,
-        });
-      }
-      continue;
-    }
-
+    const traveler = travelers.find(
+      (t) => t.name.toLowerCase() === String(i.forTraveler || "").toLowerCase()
+    );
+    let isShared = forcePersonalIfNeeded(
+      name,
+      category,
+      Boolean(i.isShared)
+    );
     if (isShared && traveler) isShared = false;
 
     const notes = i.notes
@@ -141,13 +109,13 @@ function mapAiItems(
       source: "ai",
       assigneeKey: isShared
         ? "shared"
-        : traveler?.key || travelers[0]?.key || "traveler-1",
+        : traveler?.key || undefined,
       priority: itemPriority(name, category, notes, i.priority),
       suggestedBag: i.suggestedBag ? String(i.suggestedBag) : null,
     });
   }
 
-  return items;
+  return expandPersonalItems(items, travelers);
 }
 
 /**
@@ -191,11 +159,12 @@ export async function buildPackList(args: {
       system: `Du bist Packlisten- und Reise-Experte für FlexiPack (Schweiz). Erstelle eine vollständige Packliste PLUS ausführliche Reisetipps.
 
 Prinzipien Packliste:
-1) Für JEDE Person in travelers persönliche Items (isShared=false, forTraveler=exakter Name): Pass, Tickets, Einreiseformulare, Zahnbürste, Medikamente, Unterwäsche, Powerbank, Ladekabel, eigene Schuhe/Abendgarderobe. Auch Kind/3. Person vollständig bedenken.
-2) Gemeinsam (isShared=true): nur wirklich Teilbares (Zahnpasta, Duschgel, Sonnencreme, Schirm, Erste Hilfe).
-3) Priorität: EARLY (Formulare/Visa/Impfung/Einreise), DAY_OF (Bordkarte/Schlüssel), NORMAL sonst.
-4) ${DESTINATION_RESEARCH}
-5) Schweizer Hochdeutsch (ss statt ß).
+1) Für JEDE Person in travelers EIGENE Zeilen (isShared=false, forTraveler=exakter Name). NIEMALS eine Zeile mit Menge = Personenanzahl auf eine Person legen. Beispiel falsch: Zahnbürste qty 2 für Anna. Richtig: Zahnbürste qty 1 für Anna UND Zahnbürste qty 1 für Rolf. Gleich für Pass, Tickets, Unterwäsche, T-Shirts, Socken, Ladekabel, Powerbank, Schuhe.
+2) Mengen sind immer pro Person (T-Shirts qty 3 = 3 Stück für DIESE Person, nicht für die Gruppe).
+3) Gemeinsam (isShared=true, forTraveler=null): nur wirklich Teilbares (Zahnpasta, Duschgel, Sonnencreme, Schirm, Erste Hilfe).
+4) Priorität: EARLY (Formulare/Visa/Impfung/Einreise), DAY_OF (Bordkarte/Schlüssel), NORMAL sonst.
+5) ${DESTINATION_RESEARCH}
+6) Schweizer Hochdeutsch (ss statt ß).
 
 Zusätzlich:
 - tips: 10–18 kurze, konkrete Bullet-Tipps (mind. 4 zu Einreise/Vorschriften/Do's-Don'ts).
@@ -292,7 +261,7 @@ Wichtig — Abgleich mit «existing» (bereits auf der Liste):
 - Semantische Duplikate NIEMALS erneut vorschlagen: Pass≈Reisepass≈Ausweis, T-Shirt≈Shirt≈Oberteil, Socken≈Sockenpaar, Ladekabel≈USB-Kabel, Sonnencreme≈Sonnenschutz, Regenjacke≈Regenmantel, Zahnbürste≈Zahnputzzeug, Medikamente≈Reiseapotheke, Unterwäsche≈Slips/Boxershorts.
 - Auch ähnliche Schreibweisen, Singular/Plural und «für Name» in notes zählen als schon vorhanden.
 - Mengen bestehender Items nicht erhöhen — nur ganz neue Lücken schliessen.
-- Für JEDE Person in travelers prüfen: persönliche Basics und zielbezogene Formalitäten.
+- Für JEDE Person in travelers prüfen: persönliche Basics und zielbezogene Formalitäten — je eigene Zeile, keine Gruppenmenge auf einer Person.
 - Persönlich vs gemeinsam wie üblich. ${DESTINATION_RESEARCH}
 
 Koffer-Kapazität:

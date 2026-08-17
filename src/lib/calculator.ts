@@ -7,6 +7,7 @@ import type {
   WeatherTag,
 } from "./types";
 import { inferPriority } from "./priority";
+import { expandPersonalItems } from "./pack-ownership";
 
 function legDays(leg: LegInput): number {
   const start = parseISO(leg.startDate);
@@ -337,7 +338,7 @@ export function calculatePackList(
   pushShared("Zahnpasta", "Pflege", 1);
   pushShared("Erste-Hilfe-Mini", "Gesundheit", 1);
 
-  return items;
+  return expandPersonalItems(items, profiles);
 }
 
 export function summarizeLaundry(legs: LegInput[]) {

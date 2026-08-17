@@ -26,6 +26,8 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { GenderPicker } from "@/components/ui/gender-picker";
 import { DatePicker } from "@/components/ui/date-picker";
 import { SwipeRow } from "@/components/ui/swipe-row";
@@ -1257,34 +1259,45 @@ export function TripWorkspace({
     return a.name.localeCompare(b.name, "de");
   };
 
-  const earlyItems = useMemo(
-    () =>
-      filtered
-        .filter((i) => resolvePriority(i) === "EARLY")
-        .sort(sortItems),
-    [filtered]
-  );
-
-  const dayOfItems = useMemo(
-    () =>
-      filtered
-        .filter((i) => resolvePriority(i) === "DAY_OF")
-        .sort(sortItems),
-    [filtered]
-  );
-
-  const byCategory = useMemo(() => {
-    const map = new Map<string, PackItem[]>();
-    for (const item of filtered) {
-      const p = resolvePriority(item);
-      if (p === "EARLY" || p === "DAY_OF") continue;
-      if (!map.has(item.category)) map.set(item.category, []);
-      map.get(item.category)!.push(item);
+  const ownerGroups = useMemo(() => {
+    const groups: {
+      key: string;
+      label: string;
+      color: string;
+      items: PackItem[];
+    }[] = [];
+    const index = new Map<string, number>();
+    const add = (key: string, label: string, color: string) => {
+      index.set(key, groups.length);
+      groups.push({ key, label, color, items: [] });
+    };
+    const self = trip.members.find((m) => m.user.id === user.id);
+    if (self) add(self.user.id, "Meine Liste", self.user.color);
+    for (const m of trip.members) {
+      if (m.user.id === user.id) continue;
+      add(m.user.id, m.user.name, m.user.color);
     }
-    return [...map.entries()].map(
-      ([cat, items]) => [cat, [...items].sort(sortItems)] as const
-    );
-  }, [filtered]);
+    add("shared", "Gemeinsam", SHARED_COLOR);
+    add("personal", "Ohne Zuweisung", "#78716c");
+
+    for (const item of filtered) {
+      const owner = resolveItemOwner(item, trip);
+      const key =
+        owner.kind === "user"
+          ? owner.user.id
+          : owner.kind === "shared"
+            ? "shared"
+            : "personal";
+      let i = index.get(key);
+      if (i == null) {
+        add(key, owner.kind === "user" ? owner.user.name : key, "#78716c");
+        i = index.get(key)!;
+      }
+      groups[i].items.push(item);
+    }
+
+    return groups.filter((g) => g.items.length > 0);
+  }, [filtered, trip, user.id]);
 
   const duplicatePreview = useMemo(() => {
     const cleanupItems: CleanupItem[] = trip.items.map((i) => {
@@ -1607,32 +1620,36 @@ export function TripWorkspace({
               onClick={() => void togglePacked(item)}
               className="min-w-0 flex-1 text-left"
             >
-              <div className="text-card-title font-semibold text-stone-900">
+              <div className="text-card-title font-semibold text-foreground">
                 {item.quantity}× {item.name}
                 {pLabel && (
-                  <span
-                    className={cn(
-                      "ml-2 rounded-full px-2 py-0.5 text-xs font-semibold tracking-wide",
+                  <Badge
+                    variant={
                       priority === "EARLY"
-                        ? "bg-sky-100/90 text-sky-900"
+                        ? "info"
                         : priority === "DAY_OF"
-                          ? "bg-amber-100/90 text-amber-950"
-                          : "bg-stone-200/80 text-stone-700"
-                    )}
+                          ? "warning"
+                          : "muted"
+                    }
+                    className="ml-2 align-middle"
                   >
                     {pLabel}
-                  </span>
+                  </Badge>
                 )}
-                {item.isShared && (
-                  <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold uppercase tracking-wide text-amber-900">
+                {owner.kind === "shared" || item.isShared ? (
+                  <Badge variant="warning" className="ml-2 align-middle">
                     Gemeinsam
-                  </span>
-                )}
+                  </Badge>
+                ) : owner.kind === "user" ? (
+                  <Badge variant="outline" className="ml-2 align-middle">
+                    {owner.user.name}
+                  </Badge>
+                ) : null}
               </div>
-              <div className="text-sm text-stone-500">
+              <div className="text-sm text-muted-foreground">
                 {item.notes}
                 {item.packedAt && item.packedBy && (
-                  <span className="ml-1 font-medium text-teal-800">
+                  <span className="ml-1 font-medium text-primary">
                     · Gepackt von {item.packedBy.name}
                   </span>
                 )}
@@ -1849,8 +1866,8 @@ export function TripWorkspace({
             <ChecklistMotif className="absolute -right-1 bottom-0 h-24 w-36 opacity-40" />
             <p className="text-eyebrow text-teal-100/80">Packliste</p>
             <h2 className="mt-1 font-display text-section-title">Was noch fehlt?</h2>
-            <p className="mt-1 max-w-[18rem] text-base text-teal-50/85">
-              Filtern, abhaken, eigene Positionen ergänzen.
+            <p className="mt-1 max-w-[20rem] text-base text-teal-50/85">
+              Persönliche Dinge pro Person — gemeinsam nur was wirklich geteilt wird.
             </p>
           </div>
 
@@ -1883,14 +1900,14 @@ export function TripWorkspace({
           />
 
           {duplicatePreview.groupCount > 0 && (
-            <div className="card-surface relative overflow-hidden p-4">
+            <Card className="relative overflow-hidden">
               <ChecklistMotif className="pointer-events-none absolute -right-1 bottom-0 h-20 w-28 opacity-25" />
-              <div className="relative flex flex-wrap items-start justify-between gap-3">
+              <CardContent className="relative flex flex-wrap items-start justify-between gap-3 p-4">
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-semibold text-stone-900">
+                  <p className="text-sm font-semibold text-foreground">
                     Doppelte Positionen
                   </p>
-                  <p className="mt-1 text-sm text-stone-600">
+                  <p className="mt-1 text-sm text-muted-foreground">
                     {duplicatePreview.removedCount} ähnliche Einträge in{" "}
                     {duplicatePreview.groupCount} Gruppe(n) — z.B. Pass und
                     Reisepass. Mengen und Priorität werden zusammengeführt.
@@ -1903,14 +1920,15 @@ export function TripWorkspace({
                   disabled={cleanupBusy}
                   onClick={() => void cleanupDuplicates()}
                 >
-                  <Layers2 className="h-3.5 w-3.5" />
+                  <Layers2 className="h-4 w-4" />
                   {cleanupBusy ? "…" : "Aufräumen"}
                 </Button>
-              </div>
-            </div>
+              </CardContent>
+            </Card>
           )}
 
-          <div className="card-surface space-y-3 p-3.5">
+          <Card>
+            <CardContent className="space-y-3 p-3.5">
             <div className="flex flex-wrap items-center gap-2">
               {(
                 [
@@ -1920,19 +1938,16 @@ export function TripWorkspace({
                   ["shared", "Gemeinsam"],
                 ] as const
               ).map(([id, label]) => (
-                <button
+                <Button
                   key={id}
                   type="button"
+                  size="sm"
+                  variant={filter === id ? "default" : "outline"}
                   onClick={() => setFilter(id)}
-                  className={cn(
-                    "rounded-full border px-3.5 py-2 text-sm font-semibold",
-                    filter === id
-                      ? "border-teal-800 bg-teal-800 text-white"
-                      : "border-stone-200 bg-white text-stone-600"
-                  )}
+                  aria-pressed={filter === id}
                 >
                   {label}
-                </button>
+                </Button>
               ))}
             </div>
             <div className="flex flex-wrap items-center gap-2">
@@ -1964,7 +1979,8 @@ export function TripWorkspace({
               selected={participantFilter}
               onChange={setParticipantFilter}
             />
-          </div>
+            </CardContent>
+          </Card>
 
           <AddPackItemForm
             tripId={trip.id}
@@ -2002,36 +2018,74 @@ export function TripWorkspace({
             }}
           />
 
-          <div className="space-y-3">
-            {earlyItems.length > 0 &&
-              renderSection(
-                EARLY_SECTION_KEY,
-                "Rechtzeitig vorbereiten",
-                earlyItems,
-                {
-                  icon: "clock",
-                  hint: "Formulare, Visa und Co. — besser Tage oder Wochen vorher. Foto hilft bei Adaptern oder Medikamenten.",
-                }
-              )}
-            {byCategory.map(([category, items]) =>
-              renderSection(category, category, items, { icon: "briefcase" })
-            )}
-            {dayOfItems.length > 0 &&
-              renderSection(DAY_OF_SECTION_KEY, "Am Reisetag", dayOfItems, {
-                icon: "clock",
-                motif: "day",
-                hint: "Bordkarte, Schlüssel, Geldbörse — kurz vor dem Losfahren abhaken.",
-              })}
-            {earlyItems.length === 0 &&
-              byCategory.length === 0 &&
-              dayOfItems.length === 0 && (
-              <div className="card-surface p-6 text-center">
+          <div className="space-y-6">
+            {ownerGroups.map((group) => {
+              const early = group.items
+                .filter((i) => resolvePriority(i) === "EARLY")
+                .sort(sortItems);
+              const dayOf = group.items
+                .filter((i) => resolvePriority(i) === "DAY_OF")
+                .sort(sortItems);
+              const cats = new Map<string, PackItem[]>();
+              for (const item of group.items) {
+                const p = resolvePriority(item);
+                if (p === "EARLY" || p === "DAY_OF") continue;
+                if (!cats.has(item.category)) cats.set(item.category, []);
+                cats.get(item.category)!.push(item);
+              }
+              const open = group.items.filter((i) => !i.packedAt).length;
+              return (
+                <section key={group.key} className="space-y-3" aria-label={group.label}>
+                  <div className="flex items-center gap-2 px-0.5">
+                    <span
+                      className="h-3 w-3 shrink-0 rounded-full"
+                      style={{ background: group.color }}
+                      aria-hidden
+                    />
+                    <h3 className="font-display text-section-title text-foreground">
+                      {group.label}
+                    </h3>
+                    <p className="text-sm text-muted-foreground">
+                      {open} offen · {group.items.length} Positionen
+                    </p>
+                  </div>
+                  {early.length > 0 &&
+                    renderSection(
+                      `${group.key}:${EARLY_SECTION_KEY}`,
+                      "Rechtzeitig vorbereiten",
+                      early,
+                      {
+                        icon: "clock",
+                        hint: "Formulare, Visa und Co. — besser Tage oder Wochen vorher.",
+                      }
+                    )}
+                  {[...cats.entries()].map(([category, items]) =>
+                    renderSection(`${group.key}:${category}`, category, [...items].sort(sortItems), {
+                      icon: "briefcase",
+                    })
+                  )}
+                  {dayOf.length > 0 &&
+                    renderSection(
+                      `${group.key}:${DAY_OF_SECTION_KEY}`,
+                      "Am Reisetag",
+                      dayOf,
+                      {
+                        icon: "clock",
+                        motif: "day",
+                        hint: "Bordkarte, Schlüssel, Geldbörse — kurz vor dem Losfahren abhaken.",
+                      }
+                    )}
+                </section>
+              );
+            })}
+            {ownerGroups.length === 0 && (
+              <Card className="p-6 text-center">
                 <ChecklistMotif className="mx-auto h-24 w-36 opacity-80" />
-                <p className="mt-3 text-base text-stone-600">
+                <p className="mt-3 text-base text-muted-foreground">
                   Noch keine Positionen — mit «Position hinzufügen» starten oder
                   KI nutzen.
                 </p>
-              </div>
+              </Card>
             )}
           </div>
         </section>
@@ -3137,9 +3191,9 @@ export function TripWorkspace({
             </p>
             <Button
               type="button"
-              variant="outline"
+              variant="destructive"
               size="sm"
-              className="mt-3 border-rose-300 text-rose-800 hover:bg-rose-100"
+              className="mt-3"
               onClick={() => void removeTripOrLeave()}
             >
               <Trash2 className="h-3.5 w-3.5" />

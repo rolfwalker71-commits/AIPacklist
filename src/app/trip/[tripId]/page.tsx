@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect, notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
-import { serializeTrip, tripInclude } from "@/lib/trip-service";
+import { serializeTrip, tripInclude, repairStackedPersonalItems } from "@/lib/trip-service";
 import { TripWorkspace } from "@/components/trip/trip-workspace";
 import { getSessionUser } from "@/lib/auth";
 import { userCanAccessTrip } from "@/lib/trip-access";
@@ -20,6 +20,8 @@ export default async function TripPage({
   if (!(await userCanAccessTrip(user.id, tripId))) {
     notFound();
   }
+
+  await repairStackedPersonalItems(tripId);
 
   const trip = await prisma.trip.findUnique({
     where: { id: tripId },

@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { SHARED_COLOR } from "@/lib/colors";
 
@@ -34,31 +35,26 @@ export function ParticipantFilter({
   return (
     <div className="space-y-2">
       <div className="flex flex-wrap items-center gap-2">
-        <button
+        <Button
           type="button"
+          size="sm"
+          variant={allOn ? "default" : "outline"}
           onClick={() => onChange([])}
-          className={cn(
-            "rounded-full border px-3.5 py-2 text-sm font-semibold transition",
-            allOn
-              ? "border-teal-800 bg-teal-800 text-white"
-              : "border-stone-200 bg-white text-stone-600"
-          )}
+          aria-pressed={allOn}
         >
           Alle
-        </button>
+        </Button>
         {options.map((opt) => {
           const on = selected.includes(opt.key);
           return (
-            <button
+            <Button
               key={opt.key}
               type="button"
+              size="sm"
+              variant={on ? "secondary" : "outline"}
               onClick={() => toggle(opt.key)}
-              className={cn(
-                "inline-flex items-center gap-1.5 rounded-full border px-3.5 py-2 text-sm font-semibold transition",
-                on
-                  ? "border-stone-800/20 text-stone-900 shadow-sm"
-                  : "border-stone-200 bg-white text-stone-500"
-              )}
+              aria-pressed={on}
+              className={cn("gap-1.5")}
               style={
                 on
                   ? {
@@ -71,14 +67,15 @@ export function ParticipantFilter({
               <span
                 className="h-2.5 w-2.5 rounded-full"
                 style={{ background: opt.color }}
+                aria-hidden
               />
               {opt.label}
-            </button>
+            </Button>
           );
         })}
       </div>
-      <p className="text-sm text-stone-500">
-        Mehrfachwahl möglich. «Alle» setzt den Filter zurück.
+      <p className="text-sm text-muted-foreground">
+        Tippe auf eine Person, um nur ihre Packliste zu sehen.
       </p>
     </div>
   );
