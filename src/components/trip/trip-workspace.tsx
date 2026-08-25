@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Briefcase,
-  Camera,
   Check,
   ChevronDown,
   ChevronRight,
@@ -36,6 +35,7 @@ import {
   FloatingDock,
 } from "@/components/app/floating-dock";
 import { AddPackItemForm } from "@/components/trip/add-pack-item-form";
+import { ItemIllustration } from "@/components/trip/item-illustration";
 import { PackProgressCard } from "@/components/trip/pack-progress-card";
 import { TripTeamPanel } from "@/components/trip/trip-team-panel";
 import {
@@ -1463,37 +1463,21 @@ export function TripWorkspace({
             >
               <Check className="h-4 w-4" />
             </button>
-            {item.photoUrl ? (
-              <button
-                type="button"
-                data-no-swipe
-                onClick={() => pickItemPhoto(item.id)}
-                className="relative h-9 w-9 shrink-0 overflow-hidden rounded-lg border border-stone-200 bg-stone-100"
-                aria-label="Foto ändern"
-              >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={item.photoUrl}
-                  alt=""
-                  width={36}
-                  height={36}
-                  decoding="async"
-                  className="h-full w-full object-cover"
-                />
-              </button>
-            ) : (
-              <button
-                type="button"
-                data-no-swipe
-                onClick={() => pickItemPhoto(item.id)}
-                disabled={photoBusyId === item.id}
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-dashed border-stone-300 bg-white/70 text-stone-400"
-                aria-label="Foto hinzufügen"
-                title="Foto hinzufügen"
-              >
-                <Camera className="h-3.5 w-3.5" />
-              </button>
-            )}
+            <button
+              type="button"
+              data-no-swipe
+              onClick={() => pickItemPhoto(item.id)}
+              disabled={photoBusyId === item.id}
+              className="relative h-11 w-11 shrink-0 overflow-hidden rounded-xl border border-stone-200 bg-stone-100"
+              aria-label={item.photoUrl ? "Foto ändern" : "Eigenes Foto hinzufügen"}
+              title={item.photoUrl ? "Foto ändern" : "Eigenes Foto hinzufügen"}
+            >
+              <ItemIllustration
+                name={item.name}
+                category={item.category}
+                photoUrl={item.photoUrl}
+              />
+            </button>
             <button
               type="button"
               onClick={() => void togglePacked(item)}
@@ -2692,6 +2676,13 @@ export function TripWorkspace({
                                     )}
                                   >
                                     <Check className="h-3.5 w-3.5" />
+                                  </span>
+                                  <span className="h-7 w-7 shrink-0 overflow-hidden rounded-lg border border-stone-200 bg-stone-100">
+                                    <ItemIllustration
+                                      name={item.name}
+                                      category={item.category}
+                                      photoUrl={item.photoUrl}
+                                    />
                                   </span>
                                   <span className="min-w-0 flex-1">
                                     {item.quantity}× {item.name}

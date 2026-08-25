@@ -13,6 +13,7 @@ import { computePackProgress } from "@/lib/pack-progress";
 import { WEATHER_TAG_LABELS } from "@/lib/weather";
 import type { WeatherTag } from "@/lib/types";
 import { Printer } from "lucide-react";
+import { ItemIllustration } from "@/components/trip/item-illustration";
 
 type MemberUser = {
   id: string;
@@ -168,6 +169,12 @@ export function PrintTripView({ trip }: { trip: PrintTrip }) {
                 >
                   <span className="mt-0.5 inline-block h-4 w-4 shrink-0 rounded border border-stone-400">
                     {item.packedAt ? "✓" : ""}
+                  </span>
+                  <span className="h-7 w-7 shrink-0 overflow-hidden rounded-md border border-stone-200 bg-stone-100 print:bg-white">
+                    <ItemIllustration
+                      name={item.name}
+                      category={item.category}
+                    />
                   </span>
                   <span>
                     {item.quantity}× {item.name}
