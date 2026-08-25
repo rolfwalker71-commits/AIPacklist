@@ -10,6 +10,7 @@ import { filterNewPackItems } from "./pack-dedupe";
 import {
   expandPersonalItems,
   isAlwaysPersonalItem,
+  matchTravelerFromAi,
 } from "./pack-ownership";
 import type { CalculatedItem, LegInput, TravelerProfile } from "./types";
 
@@ -21,6 +22,7 @@ type AiPackResponse = {
     isShared: boolean;
     notes?: string;
     forTraveler?: string | null;
+    forTravelerId?: string | null;
     priority?: string;
     suggestedBag?: string | null;
   }[];
@@ -82,8 +84,9 @@ function mapAiItems(
     const name = String(i.name).slice(0, 80);
     const category = String(i.category || "Sonstiges").slice(0, 40);
     const quantity = Math.max(1, Number(i.quantity) || 1);
-    const traveler = travelers.find(
-      (t) => t.name.toLowerCase() === String(i.forTraveler || "").toLowerCase()
+    const traveler = matchTravelerFromAi(
+      { forTravelerId: i.forTravelerId, forTraveler: i.forTraveler },
+      travelers
     );
     let isShared = forcePersonalIfNeeded(
       name,
@@ -159,12 +162,13 @@ export async function buildPackList(args: {
       system: `Du bist Packlisten- und Reise-Experte für FlexiPack (Schweiz). Erstelle eine vollständige Packliste PLUS ausführliche Reisetipps.
 
 Prinzipien Packliste:
-1) Für JEDE Person in travelers EIGENE Zeilen (isShared=false, forTraveler=exakter Name). NIEMALS eine Zeile mit Menge = Personenanzahl auf eine Person legen. Beispiel falsch: Zahnbürste qty 2 für Anna. Richtig: Zahnbürste qty 1 für Anna UND Zahnbürste qty 1 für Rolf. Gleich für Pass, Tickets, Unterwäsche, T-Shirts, Socken, Ladekabel, Powerbank, Schuhe.
+1) Für JEDE Person in travelers EIGENE Zeilen (isShared=false, forTravelerId=exakte id aus travelers). NIEMALS eine Zeile mit Menge = Personenanzahl auf eine Person legen. Beispiel falsch: Zahnbürste qty 2 für eine Person. Richtig: je eine Zeile qty 1 mit der jeweiligen forTravelerId. Gleich für Pass, Tickets, Unterwäsche, T-Shirts, Socken, Ladekabel, Powerbank, Schuhe.
 2) Mengen sind immer pro Person (T-Shirts qty 3 = 3 Stück für DIESE Person, nicht für die Gruppe).
-3) Gemeinsam (isShared=true, forTraveler=null): nur wirklich Teilbares (Zahnpasta, Duschgel, Sonnencreme, Schirm, Erste Hilfe).
-4) Priorität: EARLY (Formulare/Visa/Impfung/Einreise), DAY_OF (Bordkarte/Schlüssel), NORMAL sonst.
-5) ${DESTINATION_RESEARCH}
-6) Schweizer Hochdeutsch (ss statt ß).
+3) Gemeinsam (isShared=true, forTravelerId=null, forTraveler=null): nur wirklich Teilbares (Zahnpasta, Duschgel, Sonnencreme, Schirm, Erste Hilfe).
+4) forTravelerId MUSS eine id aus travelers sein oder null. Keine erfundenen IDs, keine Zuweisung an eine Default-Person.
+5) Priorität: EARLY (Formulare/Visa/Impfung/Einreise), DAY_OF (Bordkarte/Schlüssel), NORMAL sonst.
+6) ${DESTINATION_RESEARCH}
+7) Schweizer Hochdeutsch (ss statt ß).
 
 Zusätzlich:
 - tips: 10–18 kurze, konkrete Bullet-Tipps (mind. 4 zu Einreise/Vorschriften/Do's-Don'ts).
@@ -172,7 +176,7 @@ Zusätzlich:
 
 JSON:
 {
-  "items": [{ "name": string, "category": string, "quantity": number, "isShared": boolean, "notes": string, "forTraveler": string|null, "priority": "EARLY"|"NORMAL"|"DAY_OF" }],
+  "items": [{ "name": string, "category": string, "quantity": number, "isShared": boolean, "notes": string, "forTravelerId": string|null, "forTraveler": string|null, "priority": "EARLY"|"NORMAL"|"DAY_OF" }],
   "tips": string[],
   "guides": [{ "title": string, "body": string }]
 }
@@ -180,6 +184,7 @@ Ziel: 30–70 Items (steigt mit Anzahl Reisender).`,
       user: JSON.stringify({
         legs: args.legs,
         travelers: travelers.map((t) => ({
+          id: t.key,
           name: t.name,
           gender: t.gender,
         })),
@@ -257,11 +262,12 @@ export async function enrichPackListWithAi(args: {
 
 Wichtig — Abgleich mit «existing» (bereits auf der Liste):
 - Denke die Idealliste komplett (wie bei einer neuen Reise).
-- Gib in «items» NUR Positionen zurück, die in existing für dieselbe Person (forTraveler) bzw. als Gemeinsam NOCH FEHLEN.
+- Gib in «items» NUR Positionen zurück, die in existing für dieselbe Person (forTravelerId) bzw. als Gemeinsam NOCH FEHLEN.
 - Semantische Duplikate NIEMALS erneut vorschlagen: Pass≈Reisepass≈Ausweis, T-Shirt≈Shirt≈Oberteil, Socken≈Sockenpaar, Ladekabel≈USB-Kabel, Sonnencreme≈Sonnenschutz, Regenjacke≈Regenmantel, Zahnbürste≈Zahnputzzeug, Medikamente≈Reiseapotheke, Unterwäsche≈Slips/Boxershorts.
 - Auch ähnliche Schreibweisen, Singular/Plural und «für Name» in notes zählen als schon vorhanden.
 - Mengen bestehender Items nicht erhöhen — nur ganz neue Lücken schliessen.
-- Für JEDE Person in travelers prüfen: persönliche Basics und zielbezogene Formalitäten — je eigene Zeile, keine Gruppenmenge auf einer Person.
+- Für JEDE Person in travelers prüfen: persönliche Basics und zielbezogene Formalitäten — je eigene Zeile mit forTravelerId, keine Gruppenmenge auf einer Person.
+- forTravelerId MUSS eine id aus travelers sein oder null. Keine Default-Person.
 - Persönlich vs gemeinsam wie üblich. ${DESTINATION_RESEARCH}
 
 Koffer-Kapazität:
@@ -271,11 +277,12 @@ Koffer-Kapazität:
 
 tips: 10–15 kurze Tipps. guides: 5–8 längere Abschnitte.
 Schweizer Hochdeutsch (ss).
-JSON: {"items":[{"name","category","quantity","isShared","notes","forTraveler","priority","suggestedBag"}],"tips":[...],"guides":[{"title","body"}],"capacityNote":string|null}.
+JSON: {"items":[{"name","category","quantity","isShared","notes","forTravelerId","forTraveler","priority","suggestedBag"}],"tips":[...],"guides":[{"title","body"}],"capacityNote":string|null}.
 Max 35 Items (nur echte Lücken).`,
       user: JSON.stringify({
         legs: args.legs,
         travelers: args.travelers.map((t) => ({
+          id: t.key,
           name: t.name,
           gender: t.gender,
         })),
@@ -285,9 +292,16 @@ Max 35 Items (nur echte Lücken).`,
           category: i.category,
           isShared: i.isShared,
           notes: i.notes,
+          forTravelerId: i.isShared
+            ? null
+            : i.assigneeKey && i.assigneeKey !== "shared"
+              ? i.assigneeKey
+              : null,
           forTraveler: i.isShared
             ? null
-            : (i.notes || "").match(/für\s+([^·]+)/i)?.[1]?.trim() || null,
+            : args.travelers.find((t) => t.key === i.assigneeKey)?.name ||
+              (i.notes || "").match(/für\s+([^·]+)/i)?.[1]?.trim() ||
+              null,
           priority: i.priority,
         })),
       }),

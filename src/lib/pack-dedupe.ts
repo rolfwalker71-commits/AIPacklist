@@ -8,6 +8,7 @@ export type DedupeItem = {
   isShared?: boolean;
   notes?: string | null;
   assigneeKey?: string | null;
+  ownerUserId?: string | null;
 };
 
 /** Strip noise so «Reisepass (gültig)» ≈ «Pass». */
@@ -86,6 +87,7 @@ export function normalizePackName(name: string): string {
 
 function ownerKey(item: DedupeItem): string {
   if (item.isShared) return "shared";
+  if (item.ownerUserId) return `u:${item.ownerUserId.toLowerCase()}`;
   if (item.assigneeKey && item.assigneeKey !== "shared") {
     return `u:${item.assigneeKey.toLowerCase()}`;
   }

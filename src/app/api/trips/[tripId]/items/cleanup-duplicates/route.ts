@@ -26,6 +26,7 @@ function toCleanupItems(
     priority: string;
     packedAt: Date | null;
     packedByUserId: string | null;
+    ownerUserId?: string | null;
     photoUrl: string | null;
     suitcaseId: string | null;
     suitcase?: { isShared: boolean; ownerUserId: string | null } | null;
@@ -54,9 +55,12 @@ function toCleanupItems(
       packedAt: i.packedAt,
       photoUrl: i.photoUrl,
       packedByUserId: i.packedByUserId,
+      ownerUserId: i.isShared
+        ? null
+        : i.ownerUserId || fromNote || fromBag || null,
       assigneeKey: i.isShared
         ? "shared"
-        : fromNote || fromBag || undefined,
+        : i.ownerUserId || fromNote || fromBag || undefined,
     };
   });
 }

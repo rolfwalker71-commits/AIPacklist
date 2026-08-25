@@ -1,4 +1,5 @@
 import { SHARED_COLOR } from "@/lib/colors";
+import { resolvePackOwnerId } from "@/lib/pack-ownership";
 
 export type ProgressMember = {
   userId: string;
@@ -29,6 +30,7 @@ type MemberUser = {
 type ProgressItem = {
   packedAt?: string | Date | null;
   isShared?: boolean;
+  ownerUserId?: string | null;
   notes?: string | null;
   suitcaseId?: string | null;
   suitcase?: {
@@ -56,33 +58,15 @@ function resolveOwner(
   | { kind: "shared" }
   | { kind: "user"; user: MemberUser }
   | { kind: "personal" } {
-  if (item.isShared) return { kind: "shared" };
-
-  const noteMatch = item.notes?.match(/für\s+([^·]+)/i);
-  if (noteMatch) {
-    const name = noteMatch[1].trim().toLowerCase();
-    const u = trip.members.find((m) => m.user.name.toLowerCase() === name)?.user;
+  const resolved = resolvePackOwnerId(item, {
+    members: trip.members.map((m) => ({ id: m.user.id, name: m.user.name })),
+    suitcases: trip.suitcases,
+  });
+  if (resolved.kind === "shared") return { kind: "shared" };
+  if (resolved.kind === "user") {
+    const u = trip.members.find((m) => m.user.id === resolved.userId)?.user;
     if (u) return { kind: "user", user: u };
   }
-
-  const bag =
-    trip.suitcases.find((s) => s.id === item.suitcaseId) ||
-    (item.suitcase
-      ? trip.suitcases.find((s) => s.id === item.suitcase?.id)
-      : undefined);
-
-  if (bag && !bag.isShared && bag.ownerUserId) {
-    const u =
-      trip.members.find((m) => m.user.id === bag.ownerUserId)?.user ||
-      bag.owner ||
-      null;
-    if (u) return { kind: "user", user: u };
-  }
-
-  if (trip.members.length === 1) {
-    return { kind: "user", user: trip.members[0].user };
-  }
-
   return { kind: "personal" };
 }
 

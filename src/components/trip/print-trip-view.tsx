@@ -54,6 +54,7 @@ type PrintTrip = {
     category: string;
     quantity: number;
     isShared: boolean;
+    ownerUserId?: string | null;
     notes: string | null;
     packedAt: string | null;
     suitcaseId: string | null;

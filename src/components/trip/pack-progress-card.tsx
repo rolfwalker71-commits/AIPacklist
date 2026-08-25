@@ -12,6 +12,7 @@ type MemberUser = {
 type PackItem = {
   packedAt: string | null;
   isShared: boolean;
+  ownerUserId?: string | null;
   notes: string | null;
   suitcaseId: string | null;
   suitcase?: {
@@ -121,7 +122,7 @@ export function PackProgressCard({ trip }: { trip: TripLike }) {
             </span>
             <div className="min-w-0 flex-1">
               <div className="flex justify-between text-sm">
-                <span className="font-medium text-stone-800">Persönlich</span>
+                <span className="font-medium text-stone-800">Ohne Zuweisung</span>
                 <span className="text-stone-500">
                   {progress.personal.packed}/{progress.personal.total}
                 </span>

@@ -47,6 +47,7 @@ model User {
   memberships        TripMember[]
   suitcases          Suitcase[]
   packedItems        PackItem[]          @relation("PackedBy")
+  ownedPackItems     PackItem[]          @relation("ItemOwner")
   sessions           Session[]
   pushSubscriptions  PushSubscription[]
 }
@@ -172,6 +173,7 @@ model PackItem {
   source         String       @default("calculator")
   packedAt       DateTime?
   packedByUserId String?
+  ownerUserId    String?
   suitcaseId     String?
   photoUrl       String?
 
@@ -179,9 +181,11 @@ model PackItem {
   trip   Trip  @relation(fields: [tripId], references: [id], onDelete: Cascade)
 
   packedBy User?     @relation("PackedBy", fields: [packedByUserId], references: [id])
+  owner    User?     @relation("ItemOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
   suitcase Suitcase? @relation(fields: [suitcaseId], references: [id])
 
   @@index([tripId])
+  @@index([ownerUserId])
 }
 
 enum PackPriority {

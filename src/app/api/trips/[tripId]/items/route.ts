@@ -5,6 +5,7 @@ import { inferPriority, normalizePriority } from "@/lib/priority";
 import { suggestCategory } from "@/lib/categorize";
 import { authErrorResponse, requireSessionUser } from "@/lib/auth";
 import { userCanAccessTrip } from "@/lib/trip-access";
+import { notesWithOwner } from "@/lib/pack-ownership";
 
 export async function PATCH(
   req: NextRequest,
@@ -22,6 +23,8 @@ export async function PATCH(
       itemId: string;
       packed?: boolean;
       suitcaseId?: string | null;
+      ownerUserId?: string | null;
+      isShared?: boolean;
     };
 
     if (!itemId) {
@@ -48,13 +51,56 @@ export async function PATCH(
       }
     }
 
+    let ownerPatch: {
+      ownerUserId?: string | null;
+      isShared?: boolean;
+      notes?: string | null;
+    } = {};
+
+    if (body.isShared === true) {
+      ownerPatch = {
+        isShared: true,
+        ownerUserId: null,
+        notes: notesWithOwner(item.notes, null),
+      };
+    } else if (body.ownerUserId !== undefined) {
+      const nextOwnerId =
+        typeof body.ownerUserId === "string" && body.ownerUserId
+          ? body.ownerUserId
+          : null;
+      if (nextOwnerId) {
+        const member = await prisma.tripMember.findUnique({
+          where: { tripId_userId: { tripId, userId: nextOwnerId } },
+          include: { user: true },
+        });
+        if (!member) {
+          return NextResponse.json(
+            { error: "Zuweisung ungültig" },
+            { status: 400 }
+          );
+        }
+        ownerPatch = {
+          isShared: false,
+          ownerUserId: nextOwnerId,
+          notes: notesWithOwner(item.notes, member.user.name),
+        };
+      } else {
+        ownerPatch = {
+          isShared: false,
+          ownerUserId: null,
+          notes: notesWithOwner(item.notes, null),
+        };
+      }
+    }
+
     const updated = await prisma.packItem.update({
       where: { id: itemId },
       data: {
         ...(packedByUserId !== undefined ? { packedByUserId, packedAt } : {}),
         ...(suitcaseId !== undefined ? { suitcaseId } : {}),
+        ...ownerPatch,
       },
-      include: { packedBy: true, suitcase: true },
+      include: { packedBy: true, suitcase: true, owner: true },
     });
 
     publish({
@@ -117,6 +163,7 @@ export async function POST(
         : null;
 
     let shared = false;
+    let ownerUserId: string | null = null;
     let assigneeName: string | null = null;
 
     if (body.assignee === "shared" || body.isShared === true) {
@@ -129,20 +176,14 @@ export async function POST(
           { status: 400 }
         );
       }
+      ownerUserId = member.userId;
       assigneeName = member.user.name;
     } else if (trip.members.length === 1) {
+      ownerUserId = trip.members[0].userId;
       assigneeName = trip.members[0].user.name;
-    } else {
-      assigneeName =
-        trip.members.find((m) => m.userId === sessionUser.id)?.user.name ||
-        sessionUser.name;
     }
 
-    const noteParts = [
-      assigneeName && !shared ? `für ${assigneeName}` : null,
-      extraNotes || null,
-    ].filter(Boolean);
-    const notes = noteParts.length ? noteParts.join(" · ") : null;
+    const notes = notesWithOwner(extraNotes || null, shared ? null : assigneeName);
 
     const categoryRaw =
       typeof body.category === "string" ? body.category.trim() : "";
@@ -166,12 +207,13 @@ export async function POST(
         category,
         quantity,
         isShared: shared,
+        ownerUserId,
         priority,
         suitcaseId: null,
         notes,
         source: "manual",
       },
-      include: { packedBy: true, suitcase: true },
+      include: { packedBy: true, suitcase: true, owner: true },
     });
 
     publish({

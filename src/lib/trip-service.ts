@@ -20,7 +20,10 @@ import { filterNewPackItems, packNamesSimilar } from "./pack-dedupe";
 import {
   isAlwaysPersonalItem,
   isUnitPersonalItem,
-  ownerNameFromNotes,
+  notesWithOwner,
+  ownerUserIdFromCalc,
+  inferOwnerUserId,
+  resolvePackOwnerId,
   travelerFitsItemGender,
 } from "./pack-ownership";
 import { USER_COLORS } from "./utils";
@@ -104,18 +107,30 @@ export async function createTripFromDraft(
   const user = await ensureUser(owner);
   const inviteCode = await allocateInviteCode();
 
+  let partnerUser = null as Awaited<ReturnType<typeof ensureUser>> | null;
+  if (partner?.name) {
+    partnerUser = await ensureUser({
+      name: partner.name,
+      color: partner.color ?? USER_COLORS[1],
+      gender: partner.gender,
+    });
+  }
+  const partnerUserId = partnerUser?.id;
+
   const travelers = [
     {
       key: user.id,
       name: user.name,
       gender: (user.gender as PackGender) || "UNSPECIFIED",
     },
-    ...(partner?.name
+    ...(partnerUser
       ? [
           {
-            key: "partner-pending",
-            name: partner.name,
-            gender: partner.gender || ("UNSPECIFIED" as PackGender),
+            key: partnerUser.id,
+            name: partnerUser.name,
+            gender:
+              (partnerUser.gender as PackGender) ||
+              ("UNSPECIFIED" as PackGender),
           },
         ]
       : []),
@@ -130,22 +145,7 @@ export async function createTripFromDraft(
       ? suitcasePlans
       : defaultPlans(user.name, partner?.name);
 
-  let partnerUserId: string | undefined;
-  let partnerUser = null as Awaited<ReturnType<typeof ensureUser>> | null;
-  if (partner?.name) {
-    partnerUser = await ensureUser({
-      name: partner.name,
-      color: partner.color ?? USER_COLORS[1],
-      gender: partner.gender,
-    });
-    partnerUserId = partnerUser.id;
-  }
-
-  const items = packedItems.map((item) =>
-    item.assigneeKey === "partner-pending" && partnerUserId
-      ? { ...item, assigneeKey: partnerUserId }
-      : item
-  );
+  const items = packedItems;
 
   const trip = await prisma.trip.create({
     data: {
@@ -211,6 +211,7 @@ export async function createTripFromDraft(
           priority: item.priority || "NORMAL",
           notes: item.notes,
           source: item.source,
+          ownerUserId: ownerUserIdFromCalc(item),
         })),
       },
     },
@@ -237,10 +238,7 @@ export async function createTripFromDraft(
       const calc = items[idx];
       let suitcaseId = shared?.id;
       if (calc && !calc.isShared) {
-        const ownerId =
-          calc.assigneeKey === "partner-pending"
-            ? partnerUserId
-            : calc.assigneeKey;
+        const ownerId = calc.assigneeKey;
         const personalBag = bags.find(
           (s) => !s.isShared && s.ownerUserId && s.ownerUserId === ownerId
         );
@@ -451,7 +449,7 @@ export async function ensureMemberPackKit(
   if (misplaced.length > 0) {
     await prisma.packItem.updateMany({
       where: { id: { in: misplaced.map((i) => i.id) } },
-      data: { suitcaseId: bag.id },
+      data: { suitcaseId: bag.id, ownerUserId: userId, isShared: false },
     });
   }
 
@@ -524,6 +522,7 @@ export async function ensureMemberPackKit(
           notes: item.notes || `für ${person.name}`,
           source: item.source || "calculator",
           suitcaseId: bag!.id,
+          ownerUserId: userId,
         })),
       });
     }
@@ -535,6 +534,7 @@ export async function ensureAllMembersPackKits(
   tripId: string,
   opts?: { skipBasics?: boolean }
 ) {
+  await backfillItemOwners(tripId);
   await repairStackedPersonalItems(tripId);
   const members = await prisma.tripMember.findMany({
     where: { tripId },
@@ -573,18 +573,14 @@ export async function repairStackedPersonalItems(tripId: string) {
     null;
 
   const assignedUser = (item: (typeof items)[number]) => {
-    const fromNote = ownerNameFromNotes(item.notes);
-    if (fromNote) {
-      const m = members.find(
-        (x) => x.name.toLowerCase() === fromNote.toLowerCase()
-      );
-      if (m) return m;
+    const resolved = resolvePackOwnerId(item, {
+      members: members.map((m) => ({ id: m.id, name: m.name })),
+      suitcases: trip.suitcases,
+    });
+    if (resolved.kind === "user") {
+      return members.find((x) => x.id === resolved.userId) || null;
     }
-    const bag = trip.suitcases.find((s) => s.id === item.suitcaseId);
-    if (bag && !bag.isShared && bag.ownerUserId) {
-      return members.find((x) => x.id === bag.ownerUserId) || null;
-    }
-    return members[0] || null;
+    return null;
   };
 
   const hasSimilarFor = (
@@ -629,10 +625,62 @@ export async function repairStackedPersonalItems(tripId: string) {
           notes: `für ${other.name}`,
           source: item.source || "calculator",
           suitcaseId: bagFor(other.id),
+          ownerUserId: other.id,
         },
       });
       items.push(created);
     }
+  }
+}
+
+/**
+ * Persist inferred owners for legacy rows (notes / suitcase)
+ * so grouping no longer depends on Freitext.
+ */
+export async function backfillItemOwners(tripId: string) {
+  const trip = await prisma.trip.findUnique({
+    where: { id: tripId },
+    include: {
+      items: { include: { suitcase: true } },
+      members: { include: { user: true } },
+      suitcases: true,
+    },
+  });
+  if (!trip) return;
+
+  const members = trip.members.map((m) => ({
+    id: m.userId,
+    name: m.user.name,
+  }));
+  const memberIds = new Set(members.map((m) => m.id));
+
+  for (const item of trip.items) {
+    if (item.isShared) {
+      if (item.ownerUserId) {
+        await prisma.packItem.update({
+          where: { id: item.id },
+          data: { ownerUserId: null },
+        });
+      }
+      continue;
+    }
+
+    if (item.ownerUserId && memberIds.has(item.ownerUserId)) continue;
+
+    const ownerUserId = inferOwnerUserId(item, {
+      members,
+      suitcases: trip.suitcases,
+    });
+    if (!ownerUserId) continue;
+
+    const ownerName = members.find((m) => m.id === ownerUserId)?.name || null;
+    await prisma.packItem.update({
+      where: { id: item.id },
+      data: {
+        ownerUserId,
+        notes: notesWithOwner(item.notes, ownerName),
+      },
+    });
   }
 }
 
@@ -642,6 +690,7 @@ export const tripInclude = {
     include: {
       packedBy: true,
       suitcase: true,
+      owner: true,
     },
     orderBy: [{ category: "asc" as const }, { name: "asc" as const }],
   },

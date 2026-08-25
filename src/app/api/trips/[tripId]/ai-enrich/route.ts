@@ -85,6 +85,9 @@ export async function POST(
       const bag = tripFresh.suitcases.find((s) => s.id === i.suitcaseId);
       const fromBag =
         bag && !bag.isShared && bag.ownerUserId ? bag.ownerUserId : null;
+      const ownerId = i.isShared
+        ? null
+        : i.ownerUserId || fromNote || fromBag || null;
       return {
         name: i.name,
         category: i.category,
@@ -93,9 +96,8 @@ export async function POST(
         priority: i.priority as "EARLY" | "NORMAL" | "DAY_OF",
         notes: i.notes || undefined,
         source: (i.source as "calculator") || "calculator",
-        assigneeKey: i.isShared
-          ? ("shared" as const)
-          : fromNote || fromBag || undefined,
+        assigneeKey: i.isShared ? ("shared" as const) : ownerId || undefined,
+        ownerUserId: ownerId,
       };
     });
 
@@ -169,9 +171,9 @@ export async function POST(
           notes: item.notes,
           source: "ai",
           suitcaseId: suitcaseId || null,
+          ownerUserId: owner?.key || null,
         },
       });
-      void owner;
     }
 
     // Rebalance: fill empty suitcase slots; move items out of overloaded bags
@@ -212,11 +214,13 @@ export async function POST(
         const noteMatch = item.notes?.match(/für\s+([^·]+)/i);
         const assigneeKey = item.isShared
           ? null
-          : travelers.find(
+          : item.ownerUserId ||
+            travelers.find(
               (t) =>
                 noteMatch &&
                 t.name.toLowerCase() === noteMatch[1].trim().toLowerCase()
-            )?.key || null;
+            )?.key ||
+            null;
 
         const nextId = pickSuitcaseForItem(
           {

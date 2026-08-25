@@ -1,7 +1,11 @@
 import Link from "next/link";
 import { redirect, notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
-import { serializeTrip, tripInclude } from "@/lib/trip-service";
+import {
+  serializeTrip,
+  tripInclude,
+  backfillItemOwners,
+} from "@/lib/trip-service";
 import { getSessionUser } from "@/lib/auth";
 import { userCanAccessTrip } from "@/lib/trip-access";
 import { PrintTripView } from "@/components/trip/print-trip-view";
@@ -20,6 +24,8 @@ export default async function TripPrintPage({
   if (!(await userCanAccessTrip(user.id, tripId))) {
     notFound();
   }
+
+  await backfillItemOwners(tripId);
 
   const trip = await prisma.trip.findUnique({
     where: { id: tripId },

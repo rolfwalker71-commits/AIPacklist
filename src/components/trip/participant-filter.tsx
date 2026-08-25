@@ -84,3 +84,7 @@ export function ParticipantFilter({
 export function sharedFilterOption(): ParticipantFilterOption {
   return { key: "shared", label: "Gemeinsam", color: SHARED_COLOR };
 }
+
+export function unassignedFilterOption(): ParticipantFilterOption {
+  return { key: "personal", label: "Ohne Zuweisung", color: "#78716c" };
+}

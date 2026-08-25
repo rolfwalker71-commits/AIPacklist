@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { serializeTrip, tripInclude } from "@/lib/trip-service";
+import { serializeTrip, tripInclude, backfillItemOwners } from "@/lib/trip-service";
 import { authErrorResponse, requireSessionUser } from "@/lib/auth";
 import { userCanAccessTrip } from "@/lib/trip-access";
 
@@ -14,6 +14,7 @@ export async function GET(
     if (!(await userCanAccessTrip(user.id, tripId))) {
       return NextResponse.json({ error: "Kein Zugang" }, { status: 403 });
     }
+    await backfillItemOwners(tripId);
     const trip = await prisma.trip.findUnique({
       where: { id: tripId },
       include: tripInclude,

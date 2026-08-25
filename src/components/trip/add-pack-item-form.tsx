@@ -20,6 +20,8 @@ type CreatedItem = {
   category: string;
   quantity: number;
   isShared: boolean;
+  ownerUserId?: string | null;
+  owner?: { id: string; name: string; color: string } | null;
   notes: string | null;
   priority?: string;
   suitcaseId: string | null;

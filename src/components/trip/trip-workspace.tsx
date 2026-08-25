@@ -39,7 +39,9 @@ import { PushOptInCard } from "@/components/app/push-opt-in";
 import {
   ParticipantFilter,
   sharedFilterOption,
+  unassignedFilterOption,
 } from "@/components/trip/participant-filter";
+import { resolvePackOwnerId } from "@/lib/pack-ownership";
 import { cn, formatDate } from "@/lib/utils";
 import type { PackGender, Transport, WeatherTag } from "@/lib/types";
 import { SUITCASE_SIZES } from "@/lib/suitcases";
@@ -93,9 +95,11 @@ type PackItem = {
   notes: string | null;
   packedAt: string | null;
   packedByUserId: string | null;
+  ownerUserId?: string | null;
   suitcaseId: string | null;
   photoUrl?: string | null;
   packedBy?: MemberUser | null;
+  owner?: MemberUser | null;
   suitcase?: {
     id: string;
     name: string;
@@ -218,34 +222,17 @@ function resolveItemOwner(
   | { kind: "shared" }
   | { kind: "user"; user: MemberUser }
   | { kind: "personal" } {
-  if (item.isShared) return { kind: "shared" };
-
-  // Prefer explicit "für Name" over suitcase — AI often puts partner items in the wrong bag
-  const noteMatch = item.notes?.match(/für\s+([^·]+)/i);
-  if (noteMatch) {
-    const name = noteMatch[1].trim().toLowerCase();
-    const u = trip.members.find((m) => m.user.name.toLowerCase() === name)?.user;
-    if (u) return { kind: "user", user: u };
-  }
-
-  const bag =
-    trip.suitcases.find((s) => s.id === item.suitcaseId) ||
-    (item.suitcase
-      ? trip.suitcases.find((s) => s.id === item.suitcase?.id)
-      : undefined);
-
-  if (bag && !bag.isShared && bag.ownerUserId) {
+  const resolved = resolvePackOwnerId(item, {
+    members: trip.members.map((m) => ({ id: m.user.id, name: m.user.name })),
+    suitcases: trip.suitcases,
+  });
+  if (resolved.kind === "shared") return { kind: "shared" };
+  if (resolved.kind === "user") {
     const u =
-      trip.members.find((m) => m.user.id === bag.ownerUserId)?.user ||
-      bag.owner ||
-      null;
+      trip.members.find((m) => m.user.id === resolved.userId)?.user ||
+      (item.owner?.id === resolved.userId ? item.owner : null);
     if (u) return { kind: "user", user: u };
   }
-
-  if (trip.members.length === 1) {
-    return { kind: "user", user: trip.members[0].user };
-  }
-
   return { kind: "personal" };
 }
 
@@ -792,6 +779,37 @@ export function TripWorkspace({
     });
   };
 
+  const assignOwner = async (itemId: string, assignee: string) => {
+    const isShared = assignee === "shared";
+    const ownerUserId =
+      isShared || assignee === "unassigned" ? null : assignee;
+    const ownerUser = ownerUserId
+      ? trip.members.find((m) => m.user.id === ownerUserId)?.user || null
+      : null;
+    setTrip((prev) => ({
+      ...prev,
+      items: prev.items.map((i) =>
+        i.id === itemId
+          ? {
+              ...i,
+              isShared,
+              ownerUserId,
+              owner: ownerUser,
+            }
+          : i
+      ),
+    }));
+    await fetch(`/api/trips/${trip.id}/items`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        itemId,
+        isShared,
+        ownerUserId,
+      }),
+    });
+  };
+
   const removeItem = async (itemId: string) => {
     setTrip((prev) => ({
       ...prev,
@@ -1231,6 +1249,7 @@ export function TripWorkspace({
         color: m.user.color,
       })),
       sharedFilterOption(),
+      unassignedFilterOption(),
     ],
     [trip.members]
   );
@@ -1245,7 +1264,11 @@ export function TripWorkspace({
       if (participantFilter.length > 0) {
         const owner = resolveItemOwner(item, trip);
         const key =
-          owner.kind === "user" ? owner.user.id : "shared";
+          owner.kind === "user"
+            ? owner.user.id
+            : owner.kind === "shared"
+              ? "shared"
+              : "personal";
         if (!participantFilter.includes(key)) return false;
       }
       return true;
@@ -1301,16 +1324,9 @@ export function TripWorkspace({
 
   const duplicatePreview = useMemo(() => {
     const cleanupItems: CleanupItem[] = trip.items.map((i) => {
-      const noteMatch = i.notes?.match(/für\s+([^·]+)/i);
-      const fromNote = noteMatch
-        ? trip.members.find(
-            (m) =>
-              m.user.name.toLowerCase() === noteMatch[1].trim().toLowerCase()
-          )?.user.id
-        : null;
-      const bag = trip.suitcases.find((s) => s.id === i.suitcaseId);
-      const fromBag =
-        bag && !bag.isShared && bag.ownerUserId ? bag.ownerUserId : null;
+      const owner = resolveItemOwner(i, trip);
+      const ownerId =
+        owner.kind === "user" ? owner.user.id : null;
       return {
         id: i.id,
         name: i.name,
@@ -1320,9 +1336,8 @@ export function TripWorkspace({
         priority: (i.priority || "NORMAL") as PackPriority,
         packedAt: i.packedAt,
         photoUrl: i.photoUrl,
-        assigneeKey: i.isShared
-          ? "shared"
-          : fromNote || fromBag || undefined,
+        ownerUserId: ownerId,
+        assigneeKey: i.isShared ? "shared" : ownerId || undefined,
       };
     });
     const groups = findDuplicateGroups(cleanupItems);
@@ -1657,19 +1672,45 @@ export function TripWorkspace({
             </button>
           </div>
           <div className="flex items-end gap-2">
-            <select
-              data-no-swipe
-              className="min-w-0 flex-1 rounded-xl border border-stone-200 bg-white px-3 py-2.5 text-base"
-              value={item.suitcaseId || ""}
-              onChange={(e) => moveSuitcase(item.id, e.target.value)}
-            >
-              {trip.suitcases.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name} (
-                  {SUITCASE_SIZES.find((x) => x.id === s.size)?.label || s.size})
-                </option>
-              ))}
-            </select>
+            <div className="grid min-w-0 flex-1 grid-cols-1 gap-2 sm:grid-cols-2">
+              <select
+                data-no-swipe
+                aria-label="Zugewiesen an"
+                className="min-w-0 rounded-xl border border-stone-200 bg-white px-3 py-2.5 text-base"
+                value={
+                  owner.kind === "shared"
+                    ? "shared"
+                    : owner.kind === "user"
+                      ? owner.user.id
+                      : "unassigned"
+                }
+                onChange={(e) => void assignOwner(item.id, e.target.value)}
+              >
+                {trip.members.map((m) => (
+                  <option key={m.user.id} value={m.user.id}>
+                    {m.user.name}
+                  </option>
+                ))}
+                <option value="shared">Gemeinsam</option>
+                <option value="unassigned">Ohne Zuweisung</option>
+              </select>
+              <select
+                data-no-swipe
+                aria-label="Koffer"
+                className="min-w-0 rounded-xl border border-stone-200 bg-white px-3 py-2.5 text-base"
+                value={item.suitcaseId || ""}
+                onChange={(e) => moveSuitcase(item.id, e.target.value)}
+              >
+                {trip.suitcases.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name} (
+                    {SUITCASE_SIZES.find((x) => x.id === s.size)?.label ||
+                      s.size}
+                    )
+                  </option>
+                ))}
+              </select>
+            </div>
             {renderAvatarStack(people, item.isShared || owner.kind === "shared")}
           </div>
         </li>
@@ -2000,6 +2041,8 @@ export function TripWorkspace({
                       category: item.category,
                       quantity: item.quantity,
                       isShared: item.isShared,
+                      ownerUserId: item.ownerUserId ?? null,
+                      owner: (item.owner as PackItem["owner"]) ?? null,
                       notes: item.notes,
                       priority:
                         (item.priority as PackItem["priority"]) || "NORMAL",
