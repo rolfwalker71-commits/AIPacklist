@@ -18,7 +18,10 @@ import { parseWeatherSummary } from "./weather";
 import { inferPriority } from "./priority";
 import { filterNewPackItems, packNamesSimilar } from "./pack-dedupe";
 import {
+  clothingNameForGender,
   isAlwaysPersonalItem,
+  isEveningWearItem,
+  isMixedGenderClothing,
   isUnitPersonalItem,
   notesWithOwner,
   ownerUserIdFromCalc,
@@ -536,6 +539,7 @@ export async function ensureAllMembersPackKits(
 ) {
   await backfillItemOwners(tripId);
   await repairStackedPersonalItems(tripId);
+  await repairGenderedPackItems(tripId);
   const members = await prisma.tripMember.findMany({
     where: { tripId },
     select: { userId: true },
@@ -630,6 +634,107 @@ export async function repairStackedPersonalItems(tripId: string) {
       });
       items.push(created);
     }
+  }
+}
+
+/**
+ * Split mixed «Anzug oder Cocktailkleid» rows and give each person
+ * the gender-appropriate evening wear.
+ */
+export async function repairGenderedPackItems(tripId: string) {
+  const trip = await prisma.trip.findUnique({
+    where: { id: tripId },
+    include: {
+      items: true,
+      members: { include: { user: true } },
+      suitcases: true,
+    },
+  });
+  if (!trip || trip.members.length < 2) return;
+
+  const members = trip.members.map((m) => ({
+    id: m.userId,
+    name: m.user.name,
+    gender: (m.user.gender as PackGender) || "UNSPECIFIED",
+  }));
+  const items = [...trip.items];
+
+  const bagFor = (userId: string) =>
+    trip.suitcases.find((s) => !s.isShared && s.ownerUserId === userId)?.id ||
+    trip.suitcases.find((s) => s.isShared)?.id ||
+    null;
+
+  const ownerOf = (item: (typeof items)[number]) => {
+    const resolved = resolvePackOwnerId(item, {
+      members: members.map((m) => ({ id: m.id, name: m.name })),
+    });
+    if (resolved.kind !== "user") return null;
+    return members.find((m) => m.id === resolved.userId) || null;
+  };
+
+  const hasSimilarFor = (name: string, userId: string) =>
+    items.some((i) => {
+      if (i.isShared) return false;
+      if (!packNamesSimilar(i.name, name)) return false;
+      return ownerOf(i)?.id === userId;
+    });
+
+  let hasEvening = items.some(
+    (i) => isEveningWearItem(i.name) || isMixedGenderClothing(i.name)
+  );
+
+  for (const item of [...items]) {
+    if (item.isShared) continue;
+    const owner = ownerOf(item);
+    if (!owner) continue;
+
+    if (isMixedGenderClothing(item.name) || isEveningWearItem(item.name)) {
+      hasEvening = true;
+      const named = clothingNameForGender(item.name, owner.gender);
+      if (named !== item.name) {
+        await prisma.packItem.update({
+          where: { id: item.id },
+          data: { name: named, category: "Festlich" },
+        });
+        item.name = named;
+        item.category = "Festlich";
+      }
+    }
+  }
+
+  if (!hasEvening) return;
+
+  for (const member of members) {
+    const named = clothingNameForGender("Abendgarderobe", member.gender);
+    if (hasSimilarFor(named, member.id)) continue;
+    if (
+      items.some(
+        (i) =>
+          !i.isShared &&
+          ownerOf(i)?.id === member.id &&
+          (isEveningWearItem(i.name) || isMixedGenderClothing(i.name))
+      )
+    ) {
+      continue;
+    }
+    const template = items.find(
+      (i) => isEveningWearItem(i.name) || isMixedGenderClothing(i.name)
+    );
+    const created = await prisma.packItem.create({
+      data: {
+        tripId,
+        name: named,
+        category: "Festlich",
+        quantity: template?.quantity || 1,
+        isShared: false,
+        priority: template?.priority || "NORMAL",
+        notes: `für ${member.name}`,
+        source: template?.source || "calculator",
+        suitcaseId: bagFor(member.id),
+        ownerUserId: member.id,
+      },
+    });
+    items.push(created);
   }
 }
 

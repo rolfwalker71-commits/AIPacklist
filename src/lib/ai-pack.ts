@@ -11,6 +11,7 @@ import {
   expandPersonalItems,
   isAlwaysPersonalItem,
   matchTravelerFromAi,
+  travelerFitsItemGender,
 } from "./pack-ownership";
 import type { CalculatedItem, LegInput, TravelerProfile } from "./types";
 
@@ -84,10 +85,15 @@ function mapAiItems(
     const name = String(i.name).slice(0, 80);
     const category = String(i.category || "Sonstiges").slice(0, 40);
     const quantity = Math.max(1, Number(i.quantity) || 1);
-    const traveler = matchTravelerFromAi(
+    const travelerRaw = matchTravelerFromAi(
       { forTravelerId: i.forTravelerId, forTraveler: i.forTraveler },
       travelers
     );
+    const traveler =
+      travelerRaw &&
+      travelerFitsItemGender(travelerRaw.gender, name)
+        ? travelerRaw
+        : undefined;
     let isShared = forcePersonalIfNeeded(
       name,
       category,
@@ -165,10 +171,14 @@ Prinzipien Packliste:
 1) Für JEDE Person in travelers EIGENE Zeilen (isShared=false, forTravelerId=exakte id aus travelers). NIEMALS eine Zeile mit Menge = Personenanzahl auf eine Person legen. Beispiel falsch: Zahnbürste qty 2 für eine Person. Richtig: je eine Zeile qty 1 mit der jeweiligen forTravelerId. Gleich für Pass, Tickets, Unterwäsche, T-Shirts, Socken, Ladekabel, Powerbank, Schuhe.
 2) Mengen sind immer pro Person (T-Shirts qty 3 = 3 Stück für DIESE Person, nicht für die Gruppe).
 3) Gemeinsam (isShared=true, forTravelerId=null, forTraveler=null): nur wirklich Teilbares (Zahnpasta, Duschgel, Sonnencreme, Schirm, Erste Hilfe).
-4) forTravelerId MUSS eine id aus travelers sein oder null. Keine erfundenen IDs, keine Zuweisung an eine Default-Person.
-5) Priorität: EARLY (Formulare/Visa/Impfung/Einreise), DAY_OF (Bordkarte/Schlüssel), NORMAL sonst.
-6) ${DESTINATION_RESEARCH}
-7) Schweizer Hochdeutsch (ss statt ß).
+4) Geschlecht strikt trennen. travelers[].gender beachten:
+   - FEMALE: Abendkleid/Cocktailkleid, Pumps, BH — nie Anzug/Krawatte/Smoking.
+   - MALE: Anzug/Smoking, Krawatte — nie Abendkleid/Pumps/BH.
+   - NIEMALS eine Zeile «Anzug oder Cocktailkleid» / «Abendgarderobe für alle».
+5) forTravelerId MUSS eine id aus travelers sein oder null. Keine erfundenen IDs, keine Zuweisung an eine Default-Person.
+6) Priorität: EARLY (Formulare/Visa/Impfung/Einreise), DAY_OF (Bordkarte/Schlüssel), NORMAL sonst.
+7) ${DESTINATION_RESEARCH}
+8) Schweizer Hochdeutsch (ss statt ß).
 
 Zusätzlich:
 - tips: 10–18 kurze, konkrete Bullet-Tipps (mind. 4 zu Einreise/Vorschriften/Do's-Don'ts).
@@ -268,6 +278,7 @@ Wichtig — Abgleich mit «existing» (bereits auf der Liste):
 - Mengen bestehender Items nicht erhöhen — nur ganz neue Lücken schliessen.
 - Für JEDE Person in travelers prüfen: persönliche Basics und zielbezogene Formalitäten — je eigene Zeile mit forTravelerId, keine Gruppenmenge auf einer Person.
 - forTravelerId MUSS eine id aus travelers sein oder null. Keine Default-Person.
+- Geschlecht: keine Mischzeilen (Anzug oder Kleid). Pro Person die passende Variante.
 - Persönlich vs gemeinsam wie üblich. ${DESTINATION_RESEARCH}
 
 Koffer-Kapazität:

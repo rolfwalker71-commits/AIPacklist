@@ -75,7 +75,8 @@ export function ParticipantFilter({
         })}
       </div>
       <p className="text-sm text-muted-foreground">
-        Tippe auf eine Person, um nur ihre Packliste zu sehen.
+        Alle zeigt jede Person als eigenen Block. Tippe einen Namen, um nur
+        diese Liste zu öffnen.
       </p>
     </div>
   );

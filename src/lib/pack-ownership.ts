@@ -82,9 +82,44 @@ export function isAlwaysPersonalItem(name: string, category?: string): boolean {
 
 function genderGate(name: string): PackGender | null {
   const n = hay(name);
-  if (FEMALE_ONLY.some((k) => n.includes(hay(k)))) return "FEMALE";
-  if (MALE_ONLY.some((k) => n.includes(hay(k)))) return "MALE";
+  const female = FEMALE_ONLY.some((k) => n.includes(hay(k)));
+  const male = MALE_ONLY.some((k) => n.includes(hay(k)));
+  if (female && male) return null;
+  if (female) return "FEMALE";
+  if (male) return "MALE";
   return null;
+}
+
+export function isMixedGenderClothing(name: string): boolean {
+  const n = hay(name);
+  if (n.includes("abendgarderobe")) return true;
+  const female = FEMALE_ONLY.some((k) => n.includes(hay(k)));
+  const male = MALE_ONLY.some((k) => n.includes(hay(k)));
+  return female && male;
+}
+
+export function isEveningWearItem(name: string): boolean {
+  const n = hay(name);
+  return (
+    n.includes("abendkleid") ||
+    n.includes("cocktailkleid") ||
+    n.includes("abendgarderobe") ||
+    n.includes("smoking") ||
+    (n.includes("anzug") &&
+      (n.includes("abend") || n.includes("gala") || n.includes("festlich")))
+  );
+}
+
+export function clothingNameForGender(
+  name: string,
+  gender: PackGender | string | undefined
+): string {
+  const g = (gender || "UNSPECIFIED") as PackGender;
+  if (isEveningWearItem(name) || isMixedGenderClothing(name)) {
+    if (g === "FEMALE") return "Abendkleid / Cocktailkleid";
+    if (g === "MALE") return "Anzug / Smoking";
+  }
+  return name;
 }
 
 export function travelerFitsItemGender(
@@ -323,6 +358,8 @@ export function expandPersonalItems(
     }
 
     const assigned = travelers.find((t) => t.key === item.assigneeKey);
+    const assignedFits =
+      assigned && travelerFitsItem(assigned, item.name) && !isMixedGenderClothing(item.name);
     const unit = isUnitPersonalItem(item.name);
     const looksStacked =
       n > 1 &&
@@ -330,20 +367,28 @@ export function expandPersonalItems(
       item.quantity >= n &&
       item.quantity % n === 0;
 
-    const expandAll = n > 1 && personal && (!assigned || looksStacked);
+    const genderedSplit =
+      n > 1 &&
+      personal &&
+      (isMixedGenderClothing(item.name) ||
+        (isEveningWearItem(item.name) && !assignedFits));
+
+    const expandAll =
+      n > 1 && personal && (!assignedFits || looksStacked || genderedSplit);
 
     if (expandAll) {
       const perQty = unit
         ? 1
         : Math.max(1, Math.round(item.quantity / n) || 1);
       for (const t of travelers) {
-        if (!travelerFitsItem(t, item.name)) continue;
-        out.push(cloneForTraveler(item, t, perQty));
+        const named = clothingNameForGender(item.name, t.gender);
+        if (!travelerFitsItem(t, named)) continue;
+        out.push(cloneForTraveler({ ...item, name: named }, t, perQty));
       }
       continue;
     }
 
-    if (assigned) {
+    if (assignedFits && assigned) {
       out.push(
         cloneForTraveler(
           item,
@@ -408,18 +453,24 @@ function fillMissingPersonalCopies(
 
     for (const t of travelers) {
       if (holders.has(t.key)) continue;
-      if (!travelerFitsItem(t, template.name)) continue;
+      const named = clothingNameForGender(template.name, t.gender);
+      if (!travelerFitsItem(t, named)) continue;
       if (
         group.some(
           (g) =>
             g.assigneeKey === t.key &&
-            packNamesSimilar(g.name, template.name)
+            (packNamesSimilar(g.name, named) ||
+              packNamesSimilar(g.name, template.name))
         )
       ) {
         continue;
       }
       extra.push(
-        cloneForTraveler(template, t, unit ? 1 : template.quantity)
+        cloneForTraveler(
+          { ...template, name: named },
+          t,
+          unit ? 1 : template.quantity
+        )
       );
     }
   }
