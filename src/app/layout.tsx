@@ -39,7 +39,6 @@ export const viewport: Viewport = {
   themeColor: "#0F766E",
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
   viewportFit: "cover",
 };
 
@@ -50,6 +49,12 @@ export default async function RootLayout({
 }>) {
   const pathname = (await headers()).get("x-pathname") || "";
   const isLogin = pathname === "/login" || pathname.startsWith("/login?");
+  const isTrip = pathname.startsWith("/trip/");
+  const shellPad = isLogin
+    ? ""
+    : isTrip
+      ? ""
+      : "pb-28 lg:pb-8 lg:pt-20";
 
   return (
     <html
@@ -57,7 +62,7 @@ export default async function RootLayout({
       className={`${outfit.variable} ${outfit.className}`}
     >
       <body className="font-sans antialiased">
-        <div className={`app-shell min-h-screen ${isLogin ? "" : "pb-24"}`}>
+        <div className={`app-shell min-h-screen ${shellPad}`}>
           {!isLogin && (
             <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
               <div className="absolute -left-24 top-0 h-72 w-72 rounded-full bg-teal-400/25 blur-3xl" />

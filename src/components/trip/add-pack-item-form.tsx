@@ -152,7 +152,7 @@ export function AddPackItemForm({
     >
       <div className="flex items-start justify-between gap-2">
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-teal-800">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-teal-800">
             Neue Position
           </p>
           <p className="mt-0.5 text-xs text-stone-500">

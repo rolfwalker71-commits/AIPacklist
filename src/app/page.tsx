@@ -33,7 +33,7 @@ export default async function HomePage() {
   }));
 
   return (
-    <main className="mx-auto max-w-lg px-4 pb-6 pt-6 md:max-w-3xl md:pt-10">
+    <main className="mx-auto max-w-lg px-4 pb-6 pt-6 md:max-w-3xl lg:max-w-6xl md:pt-10">
       <header className="mb-6 flex items-center justify-between animate-rise">
         <div className="flex items-center gap-3">
           <BrandLogo className="h-12 w-12 shrink-0" />
@@ -56,7 +56,7 @@ export default async function HomePage() {
       <section className="hero-panel animate-rise px-5 py-8">
         <TravelMotif className="absolute -right-2 bottom-0 h-40 w-60 opacity-50" />
         <p className="text-eyebrow text-teal-100/75">Deine Reisen</p>
-        <h2 className="mt-2 max-w-[15rem] font-display text-page-title leading-tight md:max-w-md">
+        <h2 className="mt-2 max-w-md font-display text-page-title leading-tight">
           Packen ohne Chaos
         </h2>
         <p className="mt-3 max-w-sm text-base text-teal-50/90">

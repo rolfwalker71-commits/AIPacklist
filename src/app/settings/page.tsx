@@ -89,7 +89,7 @@ export default function SettingsPage() {
   };
 
   return (
-    <main className="mx-auto max-w-2xl px-4 pb-20 pt-8">
+    <main className="mx-auto max-w-2xl px-4 pb-20 pt-8 lg:max-w-6xl">
       <Link href="/profil" className="text-base font-semibold text-teal-800">
         ← Profil
       </Link>

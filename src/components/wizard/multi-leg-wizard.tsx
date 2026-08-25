@@ -224,7 +224,7 @@ export function MultiLegWizard({ onSubmit, initial, busy, travelers }: Props) {
                     type="button"
                     onClick={() => updateLeg(idx, { location: loc })}
                     className={cn(
-                      "rounded-full border px-2.5 py-0.5 text-[11px]",
+                      "rounded-full border px-2.5 py-0.5 text-xs",
                       leg.location === loc
                         ? "border-teal-700 bg-teal-800 text-white"
                         : "border-stone-200 bg-white text-stone-600 hover:border-teal-300"

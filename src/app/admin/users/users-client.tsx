@@ -85,7 +85,7 @@ export default function AdminUsersPage() {
   };
 
   return (
-    <main className="mx-auto max-w-3xl px-4 pb-20 pt-8">
+    <main className="mx-auto max-w-3xl px-4 pb-20 pt-8 lg:max-w-6xl">
       <Link href="/" className="text-sm font-semibold text-teal-800">
         ← FlexiPack
       </Link>

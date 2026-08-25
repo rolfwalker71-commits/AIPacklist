@@ -7,7 +7,6 @@ import {
   Check,
   ChevronDown,
   ChevronRight,
-  Link2,
   Users,
   Luggage,
   MapPinned,
@@ -15,10 +14,8 @@ import {
   Sparkles,
   Clock,
   ListChecks,
-  X,
   Printer,
   CloudSun,
-  Trash2,
   Layers2,
 } from "lucide-react";
 import Link from "next/link";
@@ -28,14 +25,19 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { GenderPicker } from "@/components/ui/gender-picker";
 import { DatePicker } from "@/components/ui/date-picker";
 import { SwipeRow } from "@/components/ui/swipe-row";
-import { TravelMotif, SuitcaseCardArt, ChecklistMotif, TipsMotif, TeamMotif } from "@/components/app/travel-motif";
+import { TravelMotif, SuitcaseCardArt, ChecklistMotif, TipsMotif } from "@/components/app/travel-motif";
 import { BrandLogo } from "@/components/app/brand-logo";
+import {
+  DesktopPill,
+  DesktopPills,
+  DockItem,
+  FloatingDock,
+} from "@/components/app/floating-dock";
 import { AddPackItemForm } from "@/components/trip/add-pack-item-form";
 import { PackProgressCard } from "@/components/trip/pack-progress-card";
-import { PushOptInCard } from "@/components/app/push-opt-in";
+import { TripTeamPanel } from "@/components/trip/trip-team-panel";
 import {
   ParticipantFilter,
   sharedFilterOption,
@@ -346,14 +348,6 @@ export function TripWorkspace({
     "all"
   );
   const [suitcaseFilter, setSuitcaseFilter] = useState<string>("all");
-  const [nameDraft, setNameDraft] = useState(sessionUser.name);
-  const [genderDraft, setGenderDraft] = useState<PackGender>(
-    sessionUser.gender || "UNSPECIFIED"
-  );
-  const [pendingAvatar, setPendingAvatar] = useState<File | null>(null);
-  const [avatarPreviewUrl, setAvatarPreviewUrl] = useState<string | null>(null);
-  const [avatarMessage, setAvatarMessage] = useState<string | null>(null);
-  const [profileBusy, setProfileBusy] = useState(false);
   const [participantFilter, setParticipantFilter] = useState<string[]>([]);
   const [copied, setCopied] = useState(false);
   const [routeCopied, setRouteCopied] = useState(false);
@@ -397,8 +391,6 @@ export function TripWorkspace({
 
   useEffect(() => {
     setUser(sessionUser);
-    setNameDraft(sessionUser.name);
-    setGenderDraft(sessionUser.gender || "UNSPECIFIED");
   }, [sessionUser]);
 
   useEffect(() => {
@@ -479,16 +471,6 @@ export function TripWorkspace({
     void saveTripSnapshot(trip.id, trip);
   }, [trip]);
 
-  useEffect(() => {
-    if (!pendingAvatar) {
-      setAvatarPreviewUrl(null);
-      return;
-    }
-    const url = URL.createObjectURL(pendingAvatar);
-    setAvatarPreviewUrl(url);
-    return () => URL.revokeObjectURL(url);
-  }, [pendingAvatar]);
-
   const setTab = (tab: TripTab) => {
     setActiveTab(tab);
     saveTab(trip.id, tab);
@@ -554,130 +536,6 @@ export function TripWorkspace({
     };
     return () => es.close();
   }, [trip.id]);
-
-  const saveProfile = async () => {
-    if (!nameDraft.trim() || profileBusy) return;
-    setProfileBusy(true);
-    setAvatarMessage(null);
-    try {
-      let avatarUrl = user.avatarUrl ?? null;
-
-      if (pendingAvatar) {
-        const body = new FormData();
-        body.append("file", pendingAvatar);
-        const res = await fetch("/api/avatars", { method: "POST", body });
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) {
-          setAvatarMessage(
-            typeof data.error === "string"
-              ? data.error
-              : "Avatar konnte nicht hochgeladen werden"
-          );
-          return;
-        }
-        avatarUrl = data.avatarUrl ?? avatarUrl;
-      }
-
-      const next = {
-        ...user,
-        name: nameDraft.trim(),
-        gender: genderDraft,
-        avatarUrl,
-      };
-      setUser(next);
-
-      const memberRes = await fetch(`/api/trips/${trip.id}/members`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          user: {
-            name: next.name,
-            gender: next.gender,
-            avatarUrl: next.avatarUrl,
-          },
-        }),
-      });
-      if (!memberRes.ok) {
-        const data = await memberRes.json().catch(() => ({}));
-        setAvatarMessage(
-          typeof data.error === "string"
-            ? data.error
-            : "Profil konnte nicht gespeichert werden"
-        );
-        return;
-      }
-
-      const tripRes = await fetch(`/api/trips/${trip.id}`);
-      if (tripRes.ok) {
-        const tripData = await tripRes.json();
-        setTrip({
-          ...tripData,
-          aiInsights: normalizeInsights(tripData.aiInsights),
-        });
-      }
-
-      setPendingAvatar(null);
-      setAvatarMessage("Profil gespeichert");
-    } catch (e) {
-      setAvatarMessage(
-        e instanceof Error ? e.message : "Profil speichern fehlgeschlagen"
-      );
-    } finally {
-      setProfileBusy(false);
-    }
-  };
-
-  const removeAvatar = async () => {
-    if (profileBusy) return;
-    if (pendingAvatar && !user.avatarUrl) {
-      setPendingAvatar(null);
-      setAvatarMessage(null);
-      return;
-    }
-    setProfileBusy(true);
-    setAvatarMessage(null);
-    try {
-      const res = await fetch("/api/avatars", { method: "DELETE" });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        setAvatarMessage(
-          typeof data.error === "string"
-            ? data.error
-            : "Avatar konnte nicht entfernt werden"
-        );
-        return;
-      }
-      const next = { ...user, avatarUrl: null };
-      setUser(next);
-      setPendingAvatar(null);
-      await fetch(`/api/trips/${trip.id}/members`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          user: {
-            name: nameDraft.trim() || next.name,
-            gender: genderDraft,
-            avatarUrl: null,
-          },
-        }),
-      });
-      const tripRes = await fetch(`/api/trips/${trip.id}`);
-      if (tripRes.ok) {
-        const tripData = await tripRes.json();
-        setTrip({
-          ...tripData,
-          aiInsights: normalizeInsights(tripData.aiInsights),
-        });
-      }
-      setAvatarMessage("Avatar entfernt");
-    } catch (e) {
-      setAvatarMessage(
-        e instanceof Error ? e.message : "Avatar entfernen fehlgeschlagen"
-      );
-    } finally {
-      setProfileBusy(false);
-    }
-  };
 
   const togglePacked = useCallback(
     async (item: PackItem) => {
@@ -1295,7 +1153,13 @@ export function TripWorkspace({
       groups.push({ key, label, color, items: [] });
     };
     const self = trip.members.find((m) => m.user.id === user.id);
-    if (self) add(self.user.id, "Meine Liste", self.user.color);
+    if (self) {
+      add(
+        self.user.id,
+        trip.members.length > 1 ? `${self.user.name} (ich)` : self.user.name,
+        self.user.color
+      );
+    }
     for (const m of trip.members) {
       if (m.user.id === user.id) continue;
       add(m.user.id, m.user.name, m.user.color);
@@ -1803,10 +1667,107 @@ export function TripWorkspace({
     { id: "people", label: "Team", icon: Users },
   ];
 
-  const displayAvatarUrl = avatarPreviewUrl || user.avatarUrl || null;
+  const viewingOnePerson = participantFilter.length === 1;
+  const selfGroup = ownerGroups.find((g) => g.key === user.id);
+  const otherGroups = ownerGroups.filter(
+    (g) => g.key !== user.id && g.key !== "shared" && g.key !== "personal"
+  );
+  const sharedGroups = ownerGroups.filter(
+    (g) => g.key === "shared" || g.key === "personal"
+  );
+
+  const renderOwnerGroup = (
+    group: (typeof ownerGroups)[number]
+  ) => {
+    const early = group.items
+      .filter((i) => resolvePriority(i) === "EARLY")
+      .sort(sortItems);
+    const dayOf = group.items
+      .filter((i) => resolvePriority(i) === "DAY_OF")
+      .sort(sortItems);
+    const cats = new Map<string, PackItem[]>();
+    for (const item of group.items) {
+      const p = resolvePriority(item);
+      if (p === "EARLY" || p === "DAY_OF") continue;
+      if (!cats.has(item.category)) cats.set(item.category, []);
+      cats.get(item.category)!.push(item);
+    }
+    const open = group.items.filter((i) => !i.packedAt).length;
+    const personKey = `person:${group.key}`;
+    const personOpen = viewingOnePerson || isSectionOpen(personKey);
+    return (
+      <section
+        key={group.key}
+        id={`pack-person-${group.key}`}
+        className="space-y-3"
+        aria-label={group.label}
+      >
+        <button
+          type="button"
+          onClick={() => {
+            if (viewingOnePerson) return;
+            toggleSection(personKey);
+          }}
+          className="sticky top-0 z-10 flex min-h-11 w-full items-center gap-2 rounded-2xl bg-stone-50 px-2 py-2 text-left"
+          aria-expanded={personOpen}
+        >
+          {!viewingOnePerson &&
+            (personOpen ? (
+              <ChevronDown className="h-4 w-4 shrink-0 text-stone-500" />
+            ) : (
+              <ChevronRight className="h-4 w-4 shrink-0 text-stone-500" />
+            ))}
+          <span
+            className="h-3 w-3 shrink-0 rounded-full"
+            style={{ background: group.color }}
+            aria-hidden
+          />
+          <h3 className="font-display text-section-title text-foreground">
+            {group.label}
+          </h3>
+          <p className="text-sm text-muted-foreground">
+            {open} offen · {group.items.length} Positionen
+          </p>
+        </button>
+        {personOpen && (
+          <>
+            {early.length > 0 &&
+              renderSection(
+                `${group.key}:${EARLY_SECTION_KEY}`,
+                "Rechtzeitig vorbereiten",
+                early,
+                {
+                  icon: "clock",
+                  hint: "Formulare, Visa und Co. — besser Tage oder Wochen vorher.",
+                }
+              )}
+            {[...cats.entries()].map(([category, items]) =>
+              renderSection(
+                `${group.key}:${category}`,
+                category,
+                [...items].sort(sortItems),
+                { icon: "briefcase" }
+              )
+            )}
+            {dayOf.length > 0 &&
+              renderSection(
+                `${group.key}:${DAY_OF_SECTION_KEY}`,
+                "Am Reisetag",
+                dayOf,
+                {
+                  icon: "clock",
+                  motif: "day",
+                  hint: "Bordkarte, Schlüssel, Geldbörse — kurz vor dem Losfahren abhaken.",
+                }
+              )}
+          </>
+        )}
+      </section>
+    );
+  };
 
   return (
-    <div className="space-y-6 pb-28">
+    <div className="space-y-6 pb-28 lg:pb-8">
       <header className="card-surface space-y-3 p-4 md:p-5">
         <div className="flex items-start gap-3">
           <BrandLogo className="mt-0.5 h-11 w-11 shrink-0" />
@@ -1827,6 +1788,24 @@ export function TripWorkspace({
             className="h-full rounded-full bg-teal-700 transition-all duration-500"
             style={{ width: `${progress}%` }}
           />
+        </div>
+
+        <div className="hidden lg:block">
+          <DesktopPills>
+            {tabs.map((tab) => {
+              const Icon = tab.icon;
+              return (
+                <DesktopPill
+                  key={tab.id}
+                  active={activeTab === tab.id}
+                  onClick={() => setTab(tab.id)}
+                >
+                  <Icon className="size-4" />
+                  {tab.label}
+                </DesktopPill>
+              );
+            })}
+          </DesktopPills>
         </div>
 
         <div className="flex flex-wrap gap-2">
@@ -2061,68 +2040,30 @@ export function TripWorkspace({
             }}
           />
 
-          <div className="space-y-6">
-            {ownerGroups.map((group) => {
-              const early = group.items
-                .filter((i) => resolvePriority(i) === "EARLY")
-                .sort(sortItems);
-              const dayOf = group.items
-                .filter((i) => resolvePriority(i) === "DAY_OF")
-                .sort(sortItems);
-              const cats = new Map<string, PackItem[]>();
-              for (const item of group.items) {
-                const p = resolvePriority(item);
-                if (p === "EARLY" || p === "DAY_OF") continue;
-                if (!cats.has(item.category)) cats.set(item.category, []);
-                cats.get(item.category)!.push(item);
-              }
-              const open = group.items.filter((i) => !i.packedAt).length;
-              return (
-                <section key={group.key} className="space-y-3" aria-label={group.label}>
-                  <div className="flex items-center gap-2 px-0.5">
-                    <span
-                      className="h-3 w-3 shrink-0 rounded-full"
-                      style={{ background: group.color }}
-                      aria-hidden
-                    />
-                    <h3 className="font-display text-section-title text-foreground">
-                      {group.label}
-                    </h3>
-                    <p className="text-sm text-muted-foreground">
-                      {open} offen · {group.items.length} Positionen
-                    </p>
-                  </div>
-                  {early.length > 0 &&
-                    renderSection(
-                      `${group.key}:${EARLY_SECTION_KEY}`,
-                      "Rechtzeitig vorbereiten",
-                      early,
-                      {
-                        icon: "clock",
-                        hint: "Formulare, Visa und Co. — besser Tage oder Wochen vorher.",
-                      }
-                    )}
-                  {[...cats.entries()].map(([category, items]) =>
-                    renderSection(`${group.key}:${category}`, category, [...items].sort(sortItems), {
-                      icon: "briefcase",
-                    })
-                  )}
-                  {dayOf.length > 0 &&
-                    renderSection(
-                      `${group.key}:${DAY_OF_SECTION_KEY}`,
-                      "Am Reisetag",
-                      dayOf,
-                      {
-                        icon: "clock",
-                        motif: "day",
-                        hint: "Bordkarte, Schlüssel, Geldbörse — kurz vor dem Losfahren abhaken.",
-                      }
-                    )}
-                </section>
-              );
-            })}
+          <div
+            className={cn(
+              "space-y-6",
+              !viewingOnePerson &&
+                "lg:grid lg:grid-cols-2 lg:items-start lg:gap-6 lg:space-y-0"
+            )}
+          >
+            {viewingOnePerson ? (
+              ownerGroups.map(renderOwnerGroup)
+            ) : (
+              <>
+                <div className="space-y-6">
+                  {selfGroup && renderOwnerGroup(selfGroup)}
+                </div>
+                <div className="space-y-6">
+                  {otherGroups.map(renderOwnerGroup)}
+                </div>
+                <div className="space-y-6 lg:col-span-2">
+                  {sharedGroups.map(renderOwnerGroup)}
+                </div>
+              </>
+            )}
             {ownerGroups.length === 0 && (
-              <Card className="p-6 text-center">
+              <Card className="p-6 text-center lg:col-span-2">
                 <ChecklistMotif className="mx-auto h-24 w-36 opacity-80" />
                 <p className="mt-3 text-base text-muted-foreground">
                   Noch keine Positionen — mit «Position hinzufügen» starten oder
@@ -2140,7 +2081,7 @@ export function TripWorkspace({
             <TravelMotif className="absolute -right-2 bottom-0 h-28 w-44 opacity-45" />
             <p className="text-eyebrow text-amber-100/85">Route</p>
             <h2 className="mt-1 font-display text-section-title">Etappen der Reise</h2>
-            <p className="mt-1 max-w-[18rem] text-base text-amber-50/90">
+            <p className="mt-1 max-w-md text-base text-amber-50/90">
               Orte, Transport und Wetter — getrennt von der Packliste.
             </p>
           </div>
@@ -2271,7 +2212,7 @@ export function TripWorkspace({
                             setLegDraft((d) => ({ ...d, location: preset }))
                           }
                           className={cn(
-                            "rounded-full border px-2.5 py-1 text-[11px] font-medium",
+                            "rounded-full border px-2.5 py-1 text-xs font-medium",
                             legDraft.location === preset
                               ? "border-teal-700 bg-teal-50 text-teal-900"
                               : "border-stone-200 bg-stone-50 text-stone-600"
@@ -2356,7 +2297,7 @@ export function TripWorkspace({
                               }))
                             }
                             className={cn(
-                              "rounded-full border px-2.5 py-1 text-[11px] font-medium",
+                              "rounded-full border px-2.5 py-1 text-xs font-medium",
                               on
                                 ? "border-teal-700 bg-teal-50 text-teal-900"
                                 : "border-stone-200 bg-stone-50 text-stone-600"
@@ -2411,7 +2352,7 @@ export function TripWorkspace({
             <SuitcaseCardArt className="absolute -right-2 -top-1 h-24 w-36 opacity-50" />
             <p className="text-eyebrow text-teal-100/80">Übersicht</p>
             <h2 className="mt-1 font-display text-section-title">Was liegt wo?</h2>
-            <p className="mt-1 max-w-[18rem] text-base text-teal-50/85">
+            <p className="mt-1 max-w-md text-base text-teal-50/85">
               Name, Grösse und Zuweisung jederzeit ändern — tippe einen Koffer.
             </p>
           </div>
@@ -2785,7 +2726,7 @@ export function TripWorkspace({
             <TipsMotif className="absolute -right-1 bottom-0 h-28 w-40 opacity-50" />
             <p className="text-eyebrow text-teal-100/80">KI & Ratgeber</p>
             <h2 className="mt-1 font-display text-section-title">Tipps zur Reise</h2>
-            <p className="mt-1 max-w-[18rem] text-base text-teal-50/85">
+            <p className="mt-1 max-w-md text-base text-teal-50/85">
               Packliste verfeinern, Guides und Do&apos;s/Don&apos;ts — gespeichert
               auf dieser Reise.
             </p>
@@ -2878,500 +2819,37 @@ export function TripWorkspace({
       )}
 
       {activeTab === "people" && (
-        <section className="space-y-6">
-          <div className="relative overflow-hidden rounded-[1.75rem] bg-gradient-to-br from-teal-800 via-teal-700 to-blue-800 px-4 py-5 text-teal-50 shadow-md">
-            <TeamMotif className="absolute -right-1 bottom-0 h-28 w-40 opacity-50" />
-            <p className="text-eyebrow text-teal-100/80">Gruppe</p>
-            <h2 className="mt-1 font-display text-section-title">Team & Teilen</h2>
-            <p className="mt-1 max-w-[18rem] text-base text-teal-50/85">
-              Profil, Mitreisende, Pack-Einladung — und Route als Vorlage teilen.
-            </p>
-          </div>
-
-          <PackProgressCard trip={trip} />
-          <PushOptInCard />
-
-          <div className="grid gap-4 rounded-2xl border border-stone-200 bg-white/70 p-4 md:grid-cols-3">
-            <div className="space-y-3">
-              <div>
-                <Label>Dein Name</Label>
-                <Input
-                  value={nameDraft}
-                  onChange={(e) => setNameDraft(e.target.value)}
-                />
-              </div>
-              <GenderPicker value={genderDraft} onChange={setGenderDraft} />
-              <div>
-                <Label>Avatar (freiwillig)</Label>
-                <div className="mt-2 flex items-center gap-3">
-                  {displayAvatarUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={displayAvatarUrl}
-                      alt=""
-                      className="h-14 w-14 rounded-full object-cover ring-1 ring-black/5"
-                    />
-                  ) : (
-                    <span
-                      className="flex h-14 w-14 items-center justify-center rounded-full text-sm font-semibold text-white"
-                      style={{ background: user.color }}
-                    >
-                      {(nameDraft || user.name).slice(0, 1).toUpperCase()}
-                    </span>
-                  )}
-                  <div className="min-w-0 flex-1 space-y-2">
-                    <input
-                      type="file"
-                      accept="image/*"
-                      className="block w-full text-xs text-stone-600 file:mr-3 file:rounded-lg file:border-0 file:bg-teal-800 file:px-3 file:py-2 file:text-xs file:font-semibold file:text-white"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0] ?? null;
-                        setPendingAvatar(file);
-                        setAvatarMessage(
-                          file
-                            ? "Bild gewählt — tippe Speichern, damit es bleibt."
-                            : null
-                        );
-                        e.target.value = "";
-                      }}
-                    />
-                    {(displayAvatarUrl || pendingAvatar) && (
-                      <button
-                        type="button"
-                        onClick={removeAvatar}
-                        disabled={profileBusy}
-                        className="text-xs font-medium text-rose-700 hover:underline disabled:opacity-50"
-                      >
-                        Avatar entfernen
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </div>
-              {avatarMessage && (
-                <p
-                  className={`text-sm font-medium ${
-                    avatarMessage === "Profil gespeichert"
-                      ? "text-teal-800"
-                      : avatarMessage.includes("gewählt")
-                        ? "text-amber-800"
-                        : "text-rose-700"
-                  }`}
-                >
-                  {avatarMessage}
-                </p>
-              )}
-              <Button
-                type="button"
-                variant="secondary"
-                onClick={() => void saveProfile()}
-                disabled={profileBusy || !nameDraft.trim()}
-              >
-                {profileBusy ? "Speichern…" : "Speichern"}
-              </Button>
-              <p className="text-[11px] text-stone-500">
-                Profil inkl. Avatar kannst du auch unter «Profil» in der
-                unteren Navigation speichern.
-              </p>
-            </div>
-            <div>
-              <Label className="flex items-center gap-1">
-                <Users className="h-3 w-3" /> Mitreisende
-              </Label>
-              <div className="mt-2 flex flex-wrap gap-2">
-                {trip.members.map((m) => (
-                  <span
-                    key={m.id || m.user.id}
-                    className="inline-flex items-center gap-2 rounded-full border border-stone-200 bg-stone-50 px-2 py-1 text-xs"
-                  >
-                    {m.user.avatarUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={m.user.avatarUrl}
-                        alt=""
-                        className="h-5 w-5 rounded-full object-cover"
-                      />
-                    ) : (
-                      <span
-                        className="h-2.5 w-2.5 rounded-full"
-                        style={{ background: m.user.color }}
-                      />
-                    )}
-                    {m.user.name}
-                    <span className="text-stone-400">
-                      {m.user.id === trip.ownerId || m.role === "OWNER"
-                        ? "Besitzer:in"
-                        : m.role === "PARTNER"
-                          ? "Mitreisende:r"
-                          : m.role}
-                    </span>
-                    {canRemoveMember(m.user.id) && (
-                      <button
-                        type="button"
-                        onClick={() => removeMember(m.user.id)}
-                        className="ml-0.5 rounded-full p-0.5 text-stone-400 transition hover:bg-rose-50 hover:text-rose-600"
-                        aria-label={`${m.user.name} entfernen`}
-                        title="Von der Reise entfernen"
-                      >
-                        <X className="h-3.5 w-3.5" />
-                      </button>
-                    )}
-                  </span>
-                ))}
-                <span className="inline-flex items-center gap-2 rounded-full border border-amber-200 bg-amber-50 px-2 py-1 text-xs text-amber-900">
-                  <span
-                    className="h-2.5 w-2.5 rounded-full"
-                    style={{ background: SHARED_COLOR }}
-                  />
-                  Gemeinsam
-                </span>
-              </div>
-              <p className="mt-2 text-xs text-stone-500">
-                Überzählige Mitreisende mit × entfernen. Die Trip-Besitzer:in
-                bleibt immer bestehen.
-              </p>
-            </div>
-            <div>
-              <Label className="flex items-center gap-1">
-                <Link2 className="h-3 w-3" /> Einladung
-              </Label>
-              <p className="mt-2 text-sm text-stone-600">
-                Code <strong>{trip.inviteCode}</strong>
-                {trip.inviteExpiresAt && (
-                  <>
-                    {" "}
-                    · gültig bis {formatDate(trip.inviteExpiresAt)}
-                  </>
-                )}
-                {trip.inviteMaxUses != null && (
-                  <>
-                    {" "}
-                    · {trip.inviteUseCount ?? 0}/{trip.inviteMaxUses}× genutzt
-                  </>
-                )}
-              </p>
-              {trip.inviteValid === false && (
-                <p className="mt-1 text-sm text-rose-700">
-                  {trip.inviteInvalidReason || "Einladung ungültig"}
-                </p>
-              )}
-              <p className="mt-2 text-xs text-stone-500">
-                Partner:in muss eingeloggt sein und den Code/Link verwenden.
-                Alte Codes verfallen beim Erneuern. Das ist die{" "}
-                <strong>gemeinsame Packliste</strong> — nicht die Route-Vorlage.
-              </p>
-              <div className="mt-3 flex flex-wrap gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={copyEinladung}
-                  disabled={trip.inviteValid === false}
-                >
-                  <Share2 className="h-3.5 w-3.5" />
-                  {copied ? "Kopiert" : "Link kopieren"}
-                </Button>
-                {isTripOwner && (
-                  <>
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={() =>
-                        patchInvite({ regenerate: true, singleUse: false })
-                      }
-                    >
-                      Code erneuern
-                    </Button>
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={() =>
-                        patchInvite({ regenerate: true, singleUse: true })
-                      }
-                    >
-                      Einmal-Code
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => patchInvite({ extendDays: true })}
-                    >
-                      +30 Tage
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() =>
-                        patchInvite({
-                          inviteEnabled: !(trip.inviteEnabled !== false),
-                        })
-                      }
-                    >
-                      {trip.inviteEnabled === false
-                        ? "Einladung aktivieren"
-                        : "Einladung pausieren"}
-                    </Button>
-                  </>
-                )}
-              </div>
-            </div>
-
-            <div>
-              <Label className="flex items-center gap-1">
-                <MapPinned className="h-3 w-3" /> Route teilen
-              </Label>
-              <p className="mt-2 text-sm text-stone-600">
-                Andere Gruppen starten damit eine{" "}
-                <strong>eigene Reise</strong> mit denselben Etappen — ohne
-                deine Packliste, Koffer oder Tipps.
-              </p>
-              {trip.routeShareCode ? (
-                <p className="mt-2 text-sm text-stone-600">
-                  Code <strong>{trip.routeShareCode}</strong>
-                  {trip.routeShareExpiresAt && (
-                    <>
-                      {" "}
-                      · gültig bis {formatDate(trip.routeShareExpiresAt)}
-                    </>
-                  )}
-                  {trip.routeShareMaxUses != null && (
-                    <>
-                      {" "}
-                      · {trip.routeShareUseCount ?? 0}/
-                      {trip.routeShareMaxUses}× genutzt
-                    </>
-                  )}
-                </p>
-              ) : (
-                <p className="mt-2 text-sm text-stone-500">
-                  Noch kein Route-Code — Besitzer:in kann einen erzeugen.
-                </p>
-              )}
-              {trip.routeShareCode && trip.routeShareValid === false && (
-                <p className="mt-1 text-sm text-rose-700">
-                  {trip.routeShareInvalidReason || "Route-Code ungültig"}
-                </p>
-              )}
-              <div className="mt-3 flex flex-wrap gap-2">
-                {trip.routeShareCode && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={copyRouteShare}
-                    disabled={trip.routeShareValid === false}
-                  >
-                    <Share2 className="h-3.5 w-3.5" />
-                    {routeCopied ? "Kopiert" : "Route-Link kopieren"}
-                  </Button>
-                )}
-                {isTripOwner && (
-                  <>
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={() =>
-                        patchRouteShare({
-                          regenerate: true,
-                          singleUse: false,
-                        })
-                      }
-                    >
-                      {trip.routeShareCode
-                        ? "Route-Code erneuern"
-                        : "Route-Code erzeugen"}
-                    </Button>
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={() =>
-                        patchRouteShare({
-                          regenerate: true,
-                          singleUse: true,
-                        })
-                      }
-                    >
-                      Einmal-Route
-                    </Button>
-                    {trip.routeShareCode && (
-                      <>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() =>
-                            patchRouteShare({ extendDays: true })
-                          }
-                        >
-                          +30 Tage
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() =>
-                            patchRouteShare({
-                              enabled: !(trip.routeShareEnabled !== false),
-                            })
-                          }
-                        >
-                          {trip.routeShareEnabled === false
-                            ? "Route-Teilen aktivieren"
-                            : "Route-Teilen pausieren"}
-                        </Button>
-                      </>
-                    )}
-                  </>
-                )}
-              </div>
-            </div>
-          </div>
-
-          <div className="rounded-2xl border border-rose-200 bg-rose-50/60 p-4">
-            <p className="text-sm font-semibold text-rose-950">
-              {isTripOwner ? "Reise löschen" : "Reise verlassen"}
-            </p>
-            <p className="mt-1 text-sm text-rose-900/80">
-              {isTripOwner
-                ? "Löscht die gesamte Packliste für alle Mitreisenden. Auf der Startseite geht das auch per Wisch nach links."
-                : "Du verschwindest aus der Gruppe; die Reise bleibt für die anderen bestehen."}
-            </p>
-            <Button
-              type="button"
-              variant="destructive"
-              size="sm"
-              className="mt-3"
-              onClick={() => void removeTripOrLeave()}
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-              {isTripOwner ? "Reise löschen" : "Verlassen"}
-            </Button>
-          </div>
-
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <h3 className="font-display text-lg text-stone-900">Koffer</h3>
-              <Button
-                type="button"
-                variant="secondary"
-                size="sm"
-                onClick={addSuitcase}
-              >
-                Koffer hinzufügen
-              </Button>
-            </div>
-            <div className="grid gap-3 md:grid-cols-3">
-              {trip.suitcases.map((s) => {
-                const count = trip.items.filter(
-                  (i) => i.suitcaseId === s.id
-                ).length;
-                const packed = trip.items.filter(
-                  (i) => i.suitcaseId === s.id && i.packedAt
-                ).length;
-                return (
-                  <div
-                    key={s.id}
-                    className="rounded-xl border border-stone-200 bg-white/80 px-4 py-3"
-                  >
-                    <div className="flex items-start gap-3">
-                      <Luggage className="mt-0.5 h-5 w-5 text-teal-800" />
-                      <div className="min-w-0 flex-1">
-                        <div className="text-sm font-semibold">{s.name}</div>
-                        <div className="text-xs text-stone-500">
-                          {packed}/{count} Einträge
-                          {s.isShared ? " · Gemeinsam" : ""}
-                        </div>
-                        <select
-                          className="mt-2 w-full rounded-xl border border-stone-200 bg-white px-2 py-2 text-sm"
-                          value={s.size}
-                          onChange={(e) =>
-                            void updateSuitcaseSize(s.id, e.target.value)
-                          }
-                        >
-                          {SUITCASE_SIZES.map((opt) => (
-                            <option key={opt.id} value={opt.id}>
-                              {opt.label} — {opt.hint}
-                            </option>
-                          ))}
-                        </select>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="secondary"
-                          className="mt-2"
-                          onClick={() => {
-                            const openKey = `bag-${s.id}`;
-                            setTab("bags");
-                            setOpenSections((prev) => {
-                              const next = { ...prev, [openKey]: true };
-                              saveOpenSections(trip.id, next);
-                              return next;
-                            });
-                            setBagForm({
-                              open: true,
-                              suitcaseId: s.id,
-                              name: s.name,
-                              size: s.size,
-                              assignee: s.isShared
-                                ? "shared"
-                                : s.ownerUserId || user.id,
-                            });
-                          }}
-                        >
-                          Name & Zuweisung
-                        </Button>
-                      </div>
-                      {trip.suitcases.length > 1 && (
-                        <button
-                          type="button"
-                          className="text-sm text-rose-600"
-                          onClick={() => void removeSuitcase(s.id)}
-                        >
-                          Entfernen
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </section>
+        <TripTeamPanel
+          trip={trip}
+          userId={user.id}
+          isTripOwner={isTripOwner}
+          copied={copied}
+          routeCopied={routeCopied}
+          onCopyInvite={copyEinladung}
+          onPatchInvite={patchInvite}
+          onCopyRoute={copyRouteShare}
+          onPatchRoute={patchRouteShare}
+          onRemoveMember={removeMember}
+          canRemoveMember={canRemoveMember}
+          onLeaveOrDelete={() => void removeTripOrLeave()}
+        />
       )}
 
-      <nav
-        className="fixed inset-x-0 bottom-0 z-40 border-t border-teal-900/10 bg-[#FBF7F0]/95 backdrop-blur-md"
-        style={{ paddingBottom: "max(0.5rem, env(safe-area-inset-bottom))" }}
-        aria-label="Reise-Bereiche"
-      >
-        <div className="mx-auto flex max-w-lg items-stretch justify-around px-0.5 pt-1.5">
-          {tabs.map((tab) => {
-            const Icon = tab.icon;
-            const active = activeTab === tab.id;
-            return (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => setTab(tab.id)}
-                className={cn(
-                  "flex min-w-0 flex-1 flex-col items-center gap-1 rounded-xl px-1 py-2 text-xs font-semibold transition",
-                  active
-                    ? "text-teal-800"
-                    : "text-stone-500 hover:text-stone-800"
-                )}
-              >
-                <span
-                  className={cn(
-                    "flex h-9 w-9 items-center justify-center rounded-2xl transition",
-                    active
-                      ? "bg-teal-800 text-white shadow-md shadow-teal-900/20"
-                      : "bg-transparent"
-                  )}
-                >
-                  <Icon className="h-5 w-5" />
-                </span>
-                {tab.label}
-              </button>
-            );
-          })}
-        </div>
-      </nav>
+      <FloatingDock label="Reise-Bereiche">
+        {tabs.map((tab) => {
+          const Icon = tab.icon;
+          return (
+            <DockItem
+              key={tab.id}
+              label={tab.label}
+              active={activeTab === tab.id}
+              onClick={() => setTab(tab.id)}
+            >
+              <Icon className="h-5 w-5" />
+            </DockItem>
+          );
+        })}
+      </FloatingDock>
     </div>
   );
 }

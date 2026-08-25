@@ -63,7 +63,7 @@ function JoinForm() {
 
 export default function JoinPage() {
   return (
-    <main className="mx-auto max-w-lg px-4 pb-8 pt-6 md:max-w-3xl">
+    <main className="mx-auto max-w-lg px-4 pb-8 pt-6 md:max-w-3xl lg:max-w-6xl">
       <Link href="/" className="text-base font-semibold text-teal-800">
         ← Reisen
       </Link>

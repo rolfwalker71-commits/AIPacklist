@@ -14,7 +14,7 @@ export default async function ProfilPage() {
   if (!user) redirect("/login");
 
   return (
-    <main className="mx-auto max-w-lg px-4 pb-8 pt-8">
+    <main className="mx-auto max-w-lg px-4 pb-8 pt-8 lg:max-w-6xl">
       <div className="hero-panel animate-rise px-5 py-7">
         <TravelMotif className="absolute -right-4 top-2 h-32 w-52 opacity-40" />
         <div className="flex items-center gap-3">
