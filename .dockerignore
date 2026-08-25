@@ -1,5 +1,7 @@
 node_modules
 .next
+.git
+.github
 data/*.db
 data/*.db-journal
 .env
@@ -10,3 +12,7 @@ data/*.db-journal
 .agents
 .windsurf
 skills-lock.json
+AGENTS.md
+CLAUDE.md
+README.md
+

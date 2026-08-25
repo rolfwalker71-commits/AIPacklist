@@ -5,7 +5,8 @@ WORKDIR /app
 RUN apk add --no-cache libc6-compat
 COPY package.json package-lock.json ./
 # postinstall runs prisma generate — schema is not present in this stage yet
-RUN npm ci --ignore-scripts
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci --ignore-scripts
 
 FROM node:22-alpine AS builder
 WORKDIR /app
@@ -15,8 +16,11 @@ COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV DATABASE_URL="file:../data/flexipack.db"
 RUN mkdir -p data \
-  && npx prisma generate \
-  && npm run build
+  && npm run build \
+  && mkdir -p /opt/prisma-cli \
+  && cp -a node_modules/prisma /opt/prisma-cli/prisma \
+  && cp -a node_modules/@prisma /opt/prisma-cli/@prisma \
+  && cp -a node_modules/.prisma /opt/prisma-cli/.prisma
 
 FROM node:22-alpine AS runner
 WORKDIR /app
@@ -32,15 +36,16 @@ RUN apk add --no-cache libc6-compat openssl \
   && mkdir -p /app/data \
   && chown -R nextjs:nodejs /app
 
-# Prisma CLI + schema for migrate deploy
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/package.json ./package.json
-
-# Next.js standalone server
+COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
+
+# Prisma CLI after standalone so it is not overwritten by .next/standalone/node_modules
+COPY --from=builder /opt/prisma-cli/prisma ./node_modules/prisma
+COPY --from=builder /opt/prisma-cli/@prisma ./node_modules/@prisma
+COPY --from=builder /opt/prisma-cli/.prisma ./node_modules/.prisma
 COPY docker-entrypoint.sh ./docker-entrypoint.sh
 
 RUN chmod +x ./docker-entrypoint.sh \
