@@ -24,10 +24,19 @@ App: [http://localhost:3330](http://localhost:3330)
 
 ## Docker
 
-Ja — `docker-compose.yml` im Projektroot ist die Datei zum Starten. Für einen Single-Container mit SQLite reicht das:
+`docker-compose.yml` startet den Single-Container mit SQLite. Das Image kommt von GHCR; lokal bauen geht über die zweite Compose-Datei.
+
+Lokal bauen und starten:
 
 ```bash
-docker compose up --build
+docker compose -f docker-compose.yml -f docker-compose.build.yml build
+docker compose up -d
+```
+
+Remote / Produktion (nur Image, kein `--build`):
+
+```bash
+docker compose pull && docker compose up -d
 ```
 
 App dann unter [http://localhost:3330](http://localhost:3330).

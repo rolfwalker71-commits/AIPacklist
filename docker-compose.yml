@@ -1,7 +1,6 @@
 services:
   flexipack:
-    build: .
-    image: ghcr.io/rolfwalker71-commits/aipacklist:latest
+    image: ghcr.io/rolfwalker71-commits/aipacklist:${TAG:-latest}
     container_name: flexipack
     ports:
       - "3330:3330"
