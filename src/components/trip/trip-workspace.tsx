@@ -11,6 +11,7 @@ import {
   MapPinned,
   Share2,
   Sparkles,
+  Bot,
   Clock,
   ListChecks,
   Printer,
@@ -36,6 +37,7 @@ import {
 } from "@/components/app/floating-dock";
 import { AddPackItemForm } from "@/components/trip/add-pack-item-form";
 import { ItemIllustration } from "@/components/trip/item-illustration";
+import { PackAgentPanel } from "@/components/trip/pack-agent-panel";
 import { PackProgressCard } from "@/components/trip/pack-progress-card";
 import { TripTeamPanel } from "@/components/trip/trip-team-panel";
 import {
@@ -352,6 +354,7 @@ export function TripWorkspace({
   const [copied, setCopied] = useState(false);
   const [routeCopied, setRouteCopied] = useState(false);
   const [aiBusy, setAiBusy] = useState(false);
+  const [agentOpen, setAgentOpen] = useState(false);
   const [aiMessage, setAiMessage] = useState<string | null>(null);
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({});
   const [activeTab, setActiveTab] = useState<TripTab>("pack");
@@ -1872,6 +1875,7 @@ export function TripWorkspace({
             <h2 className="mt-1 font-display text-section-title">Was noch fehlt?</h2>
             <p className="mt-1 max-w-[20rem] text-base text-teal-50/85">
               Persönliche Dinge pro Person — gemeinsam nur was wirklich geteilt wird.
+              Der Agent prüft Lücken und fragt nach, bevor er schreibt.
             </p>
           </div>
 
@@ -1967,6 +1971,15 @@ export function TripWorkspace({
                   </option>
                 ))}
               </select>
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={() => setAgentOpen(true)}
+              >
+                <Bot className="h-4 w-4" />
+                Agent
+              </Button>
               <Button
                 type="button"
                 variant="secondary"
@@ -2724,6 +2737,10 @@ export function TripWorkspace({
           </div>
 
           <div className="flex flex-wrap gap-2">
+            <Button type="button" onClick={() => setAgentOpen(true)}>
+              <Bot className="h-4 w-4" />
+              Pack-Agent
+            </Button>
             <Button onClick={enrichWithAi} disabled={aiBusy}>
               <Sparkles className="h-4 w-4" />
               {aiBusy ? "KI denkt…" : "Liste mit KI verfeinern"}
@@ -2823,6 +2840,18 @@ export function TripWorkspace({
           onRemoveMember={removeMember}
           canRemoveMember={canRemoveMember}
           onLeaveOrDelete={() => void removeTripOrLeave()}
+        />
+      )}
+
+      {agentOpen && (
+        <PackAgentPanel
+          tripId={trip.id}
+          members={trip.members}
+          onApplied={(data) => {
+            applyTripPayload(data as Trip);
+            setAiMessage("Pack-Agent hat bestätigte Positionen ergänzt.");
+          }}
+          onClose={() => setAgentOpen(false)}
         />
       )}
 
