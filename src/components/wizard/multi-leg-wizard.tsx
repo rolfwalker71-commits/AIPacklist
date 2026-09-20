@@ -138,24 +138,24 @@ export function MultiLegWizard({ onSubmit, initial, busy, travelers }: Props) {
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-teal-200/60 bg-teal-50/70 px-4 py-3 text-sm text-teal-950">
+      <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-[var(--edge)]/60 bg-[var(--secondary)] px-4 py-3 text-sm text-foreground">
         <Waves className="h-4 w-4" />
         <span>
           Gesamtreise: <strong>{totalDays} Tage</strong>
         </span>
-        <span className="text-teal-700/50">·</span>
+        <span className="text-primary/50">·</span>
         <span>
           Max. ohne Wäsche: <strong>{summary.daysWithoutLaundry} Tage</strong>
         </span>
         {summary.atlanticAutumn && (
           <>
-            <span className="text-teal-700/50">·</span>
+            <span className="text-primary/50">·</span>
             <span>Atlantik-/Herbst-Logik aktiv</span>
           </>
         )}
         {summary.galaEvents > 0 && (
           <>
-            <span className="text-teal-700/50">·</span>
+            <span className="text-primary/50">·</span>
             <span>{summary.galaEvents} Fest-/Gala-Abend(e)</span>
           </>
         )}
@@ -163,7 +163,7 @@ export function MultiLegWizard({ onSubmit, initial, busy, travelers }: Props) {
 
       <div className="space-y-4">
         <div className="flex items-center justify-between">
-          <h3 className="font-display text-xl text-stone-900">Etappen</h3>
+          <h3 className="font-display text-xl text-foreground">Etappen</h3>
           <Button
             type="button"
             variant="secondary"
@@ -182,7 +182,7 @@ export function MultiLegWizard({ onSubmit, initial, busy, travelers }: Props) {
         {legs.map((leg, idx) => (
           <div
             key={idx}
-            className="rounded-2xl border border-stone-200 bg-white/70 p-4 shadow-sm backdrop-blur"
+            className="rounded-2xl border border-[var(--edge)] bg-[var(--glass-thin)] p-4 shadow-sm backdrop-blur"
           >
             <div className="mb-4 flex items-start justify-between gap-3">
               <div className="flex-1">
@@ -227,7 +227,7 @@ export function MultiLegWizard({ onSubmit, initial, busy, travelers }: Props) {
                       "rounded-full border px-2.5 py-0.5 text-xs",
                       leg.location === loc
                         ? "border-teal-700 bg-teal-800 text-white"
-                        : "border-stone-200 bg-white text-stone-600 hover:border-teal-300"
+                        : "border-[var(--edge)] bg-[var(--glass-thick)] text-muted-foreground hover:border-[var(--primary)]"
                     )}
                   >
                     {loc}
@@ -270,7 +270,7 @@ export function MultiLegWizard({ onSubmit, initial, busy, travelers }: Props) {
                         "inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm transition",
                         active
                           ? "border-teal-700 bg-teal-800 text-white"
-                          : "border-stone-200 bg-white text-stone-700 hover:border-teal-300"
+                          : "border-[var(--edge)] bg-[var(--glass-thick)] text-muted-foreground hover:border-[var(--primary)]"
                       )}
                     >
                       <Icon className="h-4 w-4" />
@@ -291,7 +291,7 @@ export function MultiLegWizard({ onSubmit, initial, busy, travelers }: Props) {
                       "rounded-xl border px-3 py-2 text-sm",
                       !leg.laundryAvailable
                         ? "border-teal-700 bg-teal-800 text-white"
-                        : "border-stone-200 bg-white"
+                        : "border-[var(--edge)] bg-[var(--glass-thick)]"
                     )}
                     onClick={() =>
                       updateLeg(idx, {
@@ -308,7 +308,7 @@ export function MultiLegWizard({ onSubmit, initial, busy, travelers }: Props) {
                       "rounded-xl border px-3 py-2 text-sm",
                       leg.laundryAvailable
                         ? "border-teal-700 bg-teal-800 text-white"
-                        : "border-stone-200 bg-white"
+                        : "border-[var(--edge)] bg-[var(--glass-thick)]"
                     )}
                     onClick={() =>
                       updateLeg(idx, {
@@ -350,7 +350,7 @@ export function MultiLegWizard({ onSubmit, initial, busy, travelers }: Props) {
                       "rounded-full border px-3 py-1.5 text-xs font-medium",
                       leg.weatherTags.includes(w.id)
                         ? "border-amber-600 bg-amber-50 text-amber-900"
-                        : "border-stone-200 bg-white text-stone-600"
+                        : "border-[var(--edge)] bg-[var(--glass-thick)] text-muted-foreground"
                     )}
                   >
                     {w.label}
@@ -370,8 +370,8 @@ export function MultiLegWizard({ onSubmit, initial, busy, travelers }: Props) {
                     className={cn(
                       "rounded-full border px-3 py-1.5 text-xs font-medium",
                       leg.dressCodes.includes(d.id)
-                        ? "border-stone-800 bg-stone-900 text-white"
-                        : "border-stone-200 bg-white text-stone-600"
+                        ? "border-transparent bg-[var(--teal-900)] text-white"
+                        : "border-[var(--edge)] bg-[var(--glass-thick)] text-muted-foreground"
                     )}
                   >
                     {d.label}
@@ -383,11 +383,11 @@ export function MultiLegWizard({ onSubmit, initial, busy, travelers }: Props) {
         ))}
       </div>
 
-      <div className="rounded-2xl border border-stone-200 bg-stone-50/80 p-4">
-        <h4 className="mb-2 font-semibold text-stone-800">
+      <div className="rounded-2xl border border-[var(--edge)] bg-[var(--glass-thin)]/80 p-4">
+        <h4 className="mb-2 font-semibold text-foreground">
           Vorschau Berechnung ({preview.length} Einträge)
         </h4>
-        <ul className="grid gap-1 text-sm text-stone-600 md:grid-cols-2">
+        <ul className="grid gap-1 text-sm text-muted-foreground md:grid-cols-2">
           {preview.slice(0, 8).map((item) => (
             <li key={item.name}>
               {item.quantity}× {item.name}
@@ -395,7 +395,7 @@ export function MultiLegWizard({ onSubmit, initial, busy, travelers }: Props) {
             </li>
           ))}
           {preview.length > 8 && (
-            <li className="text-stone-400">+{preview.length - 8} weitere…</li>
+            <li className="text-subtle">+{preview.length - 8} weitere…</li>
           )}
         </ul>
       </div>

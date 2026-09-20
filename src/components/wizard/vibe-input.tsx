@@ -64,14 +64,14 @@ export function VibeInput({ onParsed, travelers }: Props) {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-2 text-teal-900">
+      <div className="flex items-center gap-2 text-primary">
         <Sparkles className="h-5 w-5" />
         <h3 className="font-display text-xl">KI-Freitext</h3>
       </div>
-      <p className="text-sm text-stone-600">
+      <p className="text-sm text-muted-foreground">
         Beschreibe deine Reise in natürlicher Sprache — mit API-Schlüssel zerlegt die KI die Etappen; ohne Schlüssel greift der Regelparser.
       </p>
-      <div className="rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 text-xs text-stone-600">
+      <div className="rounded-xl border border-[var(--edge)] bg-[var(--glass-thin)] px-3 py-2 text-xs text-muted-foreground">
         {aiConfigured === null
           ? "KI-Status wird geladen…"
           : aiConfigured
@@ -79,7 +79,7 @@ export function VibeInput({ onParsed, travelers }: Props) {
             : (
               <>
                 KI inaktiv — Schlüssel unter{" "}
-                <Link href="/settings" className="font-semibold text-teal-800">
+                <Link href="/settings" className="font-semibold text-primary">
                   Einstellungen
                 </Link>{" "}
                 hinterlegen.
@@ -102,8 +102,8 @@ export function VibeInput({ onParsed, travelers }: Props) {
           placeholder='z.B. "13 Tage Transatlantik im Oktober ohne Wäsche, danach 5 Tage Florida"'
         />
       </div>
-      {error && <p className="text-sm text-rose-700">{error}</p>}
-      {summary && <p className="text-sm text-teal-800">{summary}</p>}
+      {error && <p className="text-sm text-destructive">{error}</p>}
+      {summary && <p className="text-sm text-primary">{summary}</p>}
       <Button onClick={parse} disabled={busy || !prompt.trim()}>
         {busy ? "KI wertet aus…" : "In Etappen umwandeln"}
       </Button>

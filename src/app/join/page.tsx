@@ -40,7 +40,7 @@ function JoinForm() {
   };
 
   return (
-    <div className="card-surface mx-auto max-w-md space-y-4 p-6">
+    <div className="glass rounded-[var(--r-lg)] mx-auto max-w-md space-y-4 p-6">
       <div>
         <Label>Einladungscode</Label>
         <Input
@@ -49,11 +49,11 @@ function JoinForm() {
           placeholder="ABC123"
         />
       </div>
-      <p className="text-sm text-stone-500">
+      <p className="text-sm text-muted-foreground">
         Du trittst mit deinem angemeldeten Konto bei. Partner:innen brauchen
         ebenfalls ein vom Admin angelegtes Benutzerkonto.
       </p>
-      {error && <p className="text-base text-rose-700">{error}</p>}
+      {error && <p className="text-base text-destructive">{error}</p>}
       <Button className="w-full" disabled={busy || !code} onClick={join}>
         Beitreten
       </Button>
@@ -63,26 +63,26 @@ function JoinForm() {
 
 export default function JoinPage() {
   return (
-    <main className="mx-auto max-w-lg px-4 pb-8 pt-6 md:max-w-3xl lg:max-w-6xl">
-      <Link href="/" className="text-base font-semibold text-teal-800">
+    <main className="mx-auto w-full max-w-lg px-4 pb-8 pt-8 md:max-w-2xl lg:px-8 lg:pt-10">
+      <Link href="/" className="text-base font-semibold text-primary">
         ← Reisen
       </Link>
-      <h1 className="mt-4 font-display text-page-title text-stone-950">
+      <h1 className="mt-4 font-display text-page-title text-foreground">
         Reise beitreten
       </h1>
-      <p className="mt-2 text-base text-stone-600">
+      <p className="mt-2 text-base text-muted-foreground">
         Pack-Einladung von der Trip-Besitzer:in — gemeinsame Packliste. Danach
         unter «Reisen».
       </p>
       <TravelMotif className="mt-4 h-28 w-full max-w-xs opacity-80" />
       <div className="mt-4">
-        <Suspense fallback={<p className="text-base text-stone-500">Laden…</p>}>
+        <Suspense fallback={<p className="text-base text-muted-foreground">Laden…</p>}>
           <JoinForm />
         </Suspense>
       </div>
-      <p className="mt-6 text-sm text-stone-600">
+      <p className="mt-6 text-sm text-muted-foreground">
         Nur die Route (Etappen) übernehmen und selbst packen?{" "}
-        <Link href="/create" className="font-semibold text-teal-800">
+        <Link href="/create" className="font-semibold text-primary">
           Aus Route starten
         </Link>
       </p>

@@ -89,11 +89,11 @@ export function SuitcasePlanner({
   ];
 
   return (
-    <div className="space-y-4 rounded-2xl border border-stone-200 bg-white/70 p-4">
+    <div className="space-y-4 rounded-2xl border border-[var(--edge)] bg-[var(--glass-thin)] p-4">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <h3 className="font-display text-lg text-stone-900">Koffer</h3>
-          <p className="text-sm text-stone-500">
+          <h3 className="font-display text-lg text-foreground">Koffer</h3>
+          <p className="text-sm text-muted-foreground">
             Anzahl und Grösse festlegen — hilft bei Koffer-Aufteilung und
             Gepäckverlust.
           </p>
@@ -107,12 +107,12 @@ export function SuitcasePlanner({
         {plans.map((plan, idx) => (
           <div
             key={plan.id}
-            className="grid gap-3 rounded-xl border border-stone-200 bg-stone-50/80 p-3 md:grid-cols-[1fr_1fr_1fr_auto]"
+            className="grid gap-3 rounded-xl border border-[var(--edge)] bg-[var(--glass-thin)]/80 p-3 md:grid-cols-[1fr_1fr_1fr_auto]"
           >
             <div>
               <Label>Name</Label>
               <div className="relative">
-                <Luggage className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-teal-800" />
+                <Luggage className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-primary" />
                 <Input
                   className="pl-9"
                   value={plan.name}
@@ -134,7 +134,7 @@ export function SuitcasePlanner({
                       "rounded-lg border px-2.5 py-2 text-xs font-semibold",
                       plan.size === s.id
                         ? "border-teal-800 bg-teal-800 text-white"
-                        : "border-stone-200 bg-white text-stone-700"
+                        : "border-[var(--edge)] bg-[var(--glass-thick)] text-muted-foreground"
                     )}
                   >
                     {s.label}
@@ -145,7 +145,7 @@ export function SuitcasePlanner({
             <div>
               <Label>Zuordnung</Label>
               <select
-                className="flex h-11 w-full rounded-xl border border-stone-300 bg-white/80 px-3 text-sm"
+                className="flex h-11 w-full rounded-xl border border-[var(--edge-strong)] bg-[var(--glass-thick)] px-3 text-sm"
                 value={plan.ownerRole}
                 onChange={(e) =>
                   update(plan.id, {
@@ -175,7 +175,7 @@ export function SuitcasePlanner({
           </div>
         ))}
       </div>
-      <p className="text-xs text-stone-500">
+      <p className="text-xs text-muted-foreground">
         {plans.length} Koffer · Grössen:{" "}
         {SUITCASE_SIZES.map((s) => `${s.label}=${s.hint}`).join(" · ")}
       </p>

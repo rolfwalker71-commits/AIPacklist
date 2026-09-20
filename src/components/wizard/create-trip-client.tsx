@@ -155,7 +155,7 @@ export function CreateTripClient() {
               "inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold transition",
               mode === id
                 ? "border-teal-800 bg-teal-800 text-white"
-                : "border-stone-200 bg-white/80 text-stone-700 hover:border-teal-300"
+                : "border-[var(--edge)] bg-[var(--glass-thick)] text-muted-foreground hover:border-[var(--primary)]"
             )}
           >
             <Icon className="h-4 w-4" />
@@ -164,7 +164,7 @@ export function CreateTripClient() {
         ))}
       </div>
 
-      <div className="grid gap-6 rounded-2xl border border-stone-200 bg-white/70 p-4 md:grid-cols-2">
+      <div className="grid gap-6 rounded-2xl border border-[var(--edge)] bg-[var(--glass-thin)] p-4 md:grid-cols-2">
         <div className="space-y-3">
           <div>
             <Label>Dein Name (Besitzer:in)</Label>
@@ -241,7 +241,7 @@ export function CreateTripClient() {
                 : []),
             ]}
           />
-          <p className="text-sm text-stone-500">
+          <p className="text-sm text-muted-foreground">
             Nach der Erkennung landest du im Assistenten zur Feinjustierung.
           </p>
         </div>
@@ -270,7 +270,7 @@ export function CreateTripClient() {
         </div>
       )}
 
-      {error && <p className="text-sm text-rose-700">{error}</p>}
+      {error && <p className="text-sm text-destructive">{error}</p>}
     </div>
   );
 }

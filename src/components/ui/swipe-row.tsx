@@ -183,7 +183,9 @@ export function SwipeRow({
             }}
             className={cn(
               "flex h-full min-w-[72px] items-center justify-center px-3 text-xs font-semibold text-white",
-              a.tone === "danger" ? "bg-rose-600" : "bg-stone-700"
+              a.tone === "danger"
+                ? "bg-[linear-gradient(160deg,#f43f5e,#be123c)]"
+                : "bg-[var(--teal-900)]"
             )}
           >
             {a.label}

@@ -85,21 +85,21 @@ export default function AdminUsersPage() {
   };
 
   return (
-    <main className="mx-auto max-w-3xl px-4 pb-20 pt-8 lg:max-w-6xl">
-      <Link href="/" className="text-sm font-semibold text-teal-800">
+    <main className="mx-auto w-full max-w-3xl px-4 pb-20 pt-8 lg:px-8 lg:pt-10">
+      <Link href="/" className="text-sm font-semibold text-primary">
         ← FlexiPack
       </Link>
-      <h1 className="mt-4 font-display text-3xl text-stone-950">
+      <h1 className="mt-4 font-display text-3xl text-foreground">
         Benutzerverwaltung
       </h1>
-      <p className="mt-2 text-sm text-stone-600">
+      <p className="mt-2 text-sm text-muted-foreground">
         Geschlossene Konten: nur hier anlegen. Jeder User hat eigene Trips und
         kann Partner:innen per Einladungscode zu einem Trip holen.
       </p>
 
       {(error || message) && (
         <p
-          className={`mt-4 text-sm ${error ? "text-rose-700" : "text-teal-800"}`}
+          className={`mt-4 text-sm ${error ? "text-destructive" : "text-primary"}`}
         >
           {error || message}
         </p>
@@ -107,9 +107,9 @@ export default function AdminUsersPage() {
 
       <form
         onSubmit={createUser}
-        className="mt-8 space-y-3 rounded-2xl border border-stone-200 bg-white/80 p-4"
+        className="mt-8 space-y-3 rounded-2xl border border-[var(--edge)] bg-[var(--glass-thick)] p-4"
       >
-        <h2 className="font-semibold text-stone-900">Neuen Benutzer anlegen</h2>
+        <h2 className="font-semibold text-foreground">Neuen Benutzer anlegen</h2>
         <div className="grid gap-3 sm:grid-cols-2">
           <div>
             <Label>Name</Label>
@@ -140,7 +140,7 @@ export default function AdminUsersPage() {
           <div>
             <Label>Rolle</Label>
             <select
-              className="mt-1 w-full rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm"
+              className="mt-1 w-full rounded-lg border border-[var(--edge)] bg-[var(--glass-thick)] px-3 py-2 text-sm"
               value={role}
               onChange={(e) => setRole(e.target.value as "USER" | "ADMIN")}
             >
@@ -158,15 +158,15 @@ export default function AdminUsersPage() {
         {users.map((u) => (
           <li
             key={u.id}
-            className="rounded-2xl border border-stone-200 bg-white/80 p-4"
+            className="rounded-2xl border border-[var(--edge)] bg-[var(--glass-thick)] p-4"
           >
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
-                <div className="font-medium text-stone-900">
+                <div className="font-medium text-foreground">
                   {u.name}{" "}
-                  <span className="text-stone-400">@{u.username}</span>
+                  <span className="text-subtle">@{u.username}</span>
                 </div>
-                <div className="mt-1 text-xs text-stone-500">
+                <div className="mt-1 text-xs text-muted-foreground">
                   {u.role === "ADMIN" ? "Admin" : "Benutzer"} ·{" "}
                   {u.isActive ? "aktiv" : "deaktiviert"} ·{" "}
                   {u._count?.ownedTrips ?? 0} eigene Trips ·{" "}

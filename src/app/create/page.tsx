@@ -8,18 +8,18 @@ import { Button } from "@/components/ui/button";
 
 export default function CreatePage() {
   return (
-    <main className="mx-auto max-w-lg px-4 pb-8 pt-6 md:max-w-3xl lg:max-w-6xl">
+    <main className="mx-auto w-full max-w-lg px-4 pb-8 pt-8 md:max-w-3xl lg:max-w-4xl lg:px-8 lg:pt-10">
       <div className="mb-6">
-        <Link href="/" className="text-base font-semibold text-teal-800">
+        <Link href="/" className="text-base font-semibold text-primary">
           ← Reisen
         </Link>
-        <div className="card-surface mt-3 flex items-start gap-4 p-4">
+        <div className="glass rounded-[var(--r-lg)] mt-3 flex items-start gap-4 p-4">
           <ChecklistMotif className="mt-1 h-20 w-28 shrink-0" />
           <div>
-            <h1 className="font-display text-page-title text-stone-950">
+            <h1 className="font-display text-page-title text-foreground">
               Neue Reise
             </h1>
-            <p className="mt-1 text-base text-stone-600">
+            <p className="mt-1 text-base text-muted-foreground">
               Assistent, KI-Freitext, Vorlage — oder eine geteilte Route
               übernehmen.
             </p>

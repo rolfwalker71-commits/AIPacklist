@@ -1,7 +1,6 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import { Chip } from "@/components/ui/segmented";
 import { SHARED_COLOR } from "@/lib/colors";
 
 export type ParticipantFilterOption = {
@@ -12,6 +11,8 @@ export type ParticipantFilterOption = {
 
 /**
  * Multi-select chips: members + shared. Empty selection = show all.
+ * A pressed chip carries the person's own colour so the active filter
+ * matches the tint on their rows.
  */
 export function ParticipantFilter({
   options,
@@ -33,51 +34,34 @@ export function ParticipantFilter({
   const allOn = selected.length === 0 || selected.length === options.length;
 
   return (
-    <div className="space-y-2">
-      <div className="flex flex-wrap items-center gap-2">
-        <Button
-          type="button"
-          size="sm"
-          variant={allOn ? "default" : "outline"}
-          onClick={() => onChange([])}
-          aria-pressed={allOn}
-        >
-          Alle
-        </Button>
-        {options.map((opt) => {
-          const on = selected.includes(opt.key);
-          return (
-            <Button
-              key={opt.key}
-              type="button"
-              size="sm"
-              variant={on ? "secondary" : "outline"}
-              onClick={() => toggle(opt.key)}
-              aria-pressed={on}
-              className={cn("gap-1.5")}
-              style={
-                on
-                  ? {
-                      background: `${opt.color}22`,
-                      borderColor: `${opt.color}55`,
-                    }
-                  : undefined
-              }
-            >
-              <span
-                className="h-2.5 w-2.5 rounded-full"
-                style={{ background: opt.color }}
-                aria-hidden
-              />
-              {opt.label}
-            </Button>
-          );
-        })}
-      </div>
-      <p className="text-sm text-muted-foreground">
-        Alle zeigt jede Person als eigenen Block. Tippe einen Namen, um nur
-        diese Liste zu öffnen.
-      </p>
+    <div className="flex flex-wrap items-center gap-2">
+      <Chip pressed={allOn} onClick={() => onChange([])}>
+        Alle
+      </Chip>
+      {options.map((opt) => {
+        const on = selected.includes(opt.key);
+        return (
+          <Chip
+            key={opt.key}
+            pressed={on}
+            onClick={() => toggle(opt.key)}
+            style={
+              on
+                ? {
+                    background: `linear-gradient(160deg, ${opt.color}, ${opt.color}cc)`,
+                  }
+                : undefined
+            }
+          >
+            <span
+              className="h-2.5 w-2.5 shrink-0 rounded-full"
+              style={{ background: on ? "rgba(255,255,255,0.9)" : opt.color }}
+              aria-hidden
+            />
+            {opt.label}
+          </Chip>
+        );
+      })}
     </div>
   );
 }

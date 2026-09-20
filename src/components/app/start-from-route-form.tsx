@@ -85,14 +85,14 @@ export function StartFromRouteForm({
   };
 
   return (
-    <form onSubmit={create} className="card-surface space-y-4 p-5">
+    <form onSubmit={create} className="glass rounded-[var(--r-lg)] space-y-4 p-5">
       <div className="flex items-start gap-3">
-        <MapPinned className="mt-0.5 h-6 w-6 shrink-0 text-teal-800" />
+        <MapPinned className="mt-0.5 h-6 w-6 shrink-0 text-primary" />
         <div>
-          <h2 className="font-display text-section-title text-stone-900">
+          <h2 className="font-display text-section-title text-foreground">
             Aus Route starten
           </h2>
-          <p className="mt-1 text-sm text-stone-600">
+          <p className="mt-1 text-sm text-muted-foreground">
             Nur Etappen werden übernommen — Packliste und Koffer bleiben leer.
             Danach eigene Gruppe und eigenen Einladungscode.
           </p>
@@ -125,9 +125,9 @@ export function StartFromRouteForm({
       </div>
 
       {preview && (
-        <div className="rounded-xl border border-teal-100 bg-teal-50/50 px-3 py-3 text-sm text-stone-700">
-          <p className="font-semibold text-stone-900">{preview.title}</p>
-          <p className="mt-0.5 text-stone-600">
+        <div className="glass tint-teal rounded-[var(--r-md)] px-3.5 py-3 text-sm text-muted-foreground">
+          <p className="font-semibold text-foreground">{preview.title}</p>
+          <p className="mt-0.5 text-muted-foreground">
             von {preview.ownerName} · {preview.summary}
           </p>
           <ul className="mt-2 space-y-1">
@@ -151,7 +151,7 @@ export function StartFromRouteForm({
         </div>
       )}
 
-      {error && <p className="text-base text-rose-700">{error}</p>}
+      {error && <p className="text-base text-destructive">{error}</p>}
 
       <Button type="submit" disabled={busy || !code.trim()}>
         {busy

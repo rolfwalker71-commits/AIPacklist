@@ -102,11 +102,11 @@ export function TripTeamPanel({
 
   return (
     <section className="space-y-6">
-      <div className="relative overflow-hidden rounded-[1.75rem] bg-gradient-to-br from-teal-800 via-teal-700 to-blue-800 px-4 py-5 text-teal-50 shadow-md">
+      <div className="hero-panel px-5 py-6">
         <TeamMotif className="absolute -right-1 bottom-0 h-28 w-40 opacity-50" />
-        <p className="text-eyebrow text-teal-100/80">Gruppe</p>
+        <p className="text-eyebrow text-[rgba(209,250,229,0.82)]">Gruppe</p>
         <h2 className="mt-1 font-display text-section-title">Wer ist dabei</h2>
-        <p className="mt-1 max-w-md text-base text-teal-50/85">
+        <p className="mt-1 max-w-md text-base text-[rgba(236,253,245,0.86)]">
           Personen, Einladung zur Packliste — und optional die Route als
           Vorlage.
         </p>
@@ -115,12 +115,12 @@ export function TripTeamPanel({
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
         <div className="space-y-3">
           <div className="flex items-end justify-between gap-3">
-            <h3 className="font-display text-section-title text-stone-900">
+            <h3 className="font-display text-section-title text-foreground">
               Personen
             </h3>
             <Link
               href="/profil"
-              className="inline-flex items-center gap-1 text-sm font-semibold text-teal-800"
+              className="inline-flex items-center gap-1 text-sm font-semibold text-primary"
             >
               <UserRound className="h-3.5 w-3.5" />
               Profil ändern
@@ -136,14 +136,14 @@ export function TripTeamPanel({
               return (
                 <li
                   key={m.id || m.user.id}
-                  className="flex items-center gap-3 rounded-2xl border border-stone-200 bg-white px-3 py-3 shadow-sm"
+                  className="flex items-center gap-3 rounded-2xl border border-[var(--edge)] bg-[var(--glass-thick)] px-3 py-3 shadow-sm"
                 >
                   {m.user.avatarUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
                       src={m.user.avatarUrl}
                       alt=""
-                      className="h-12 w-12 shrink-0 rounded-full object-cover ring-1 ring-stone-200"
+                      className="h-12 w-12 shrink-0 rounded-full object-cover ring-1 ring-[var(--edge)]"
                     />
                   ) : (
                     <span
@@ -154,18 +154,18 @@ export function TripTeamPanel({
                     </span>
                   )}
                   <div className="min-w-0 flex-1">
-                    <p className="font-semibold text-stone-950">
+                    <p className="font-semibold text-foreground">
                       {m.user.name}
                       {mine ? " (ich)" : ""}
                     </p>
-                    <p className="text-sm text-stone-500">{roleLabel(trip, m)}</p>
-                    <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-stone-200">
+                    <p className="text-sm text-muted-foreground">{roleLabel(trip, m)}</p>
+                    <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[var(--edge-strong)]">
                       <div
                         className="h-full rounded-full bg-teal-700"
                         style={{ width: `${pct}%` }}
                       />
                     </div>
-                    <p className="mt-1 text-sm text-stone-500">
+                    <p className="mt-1 text-sm text-muted-foreground">
                       {stats
                         ? `${stats.packed}/${stats.total} gepackt`
                         : "Keine Positionen"}
@@ -189,12 +189,12 @@ export function TripTeamPanel({
         </div>
 
         <div className="space-y-4">
-          <div className="rounded-2xl border border-stone-200 bg-white p-4 shadow-sm">
-            <p className="flex items-center gap-1.5 text-sm font-semibold text-stone-900">
-              <Users className="h-4 w-4 text-teal-800" />
+          <div className="rounded-2xl border border-[var(--edge)] bg-[var(--glass-thick)] p-4 shadow-sm">
+            <p className="flex items-center gap-1.5 text-sm font-semibold text-foreground">
+              <Users className="h-4 w-4 text-primary" />
               Packliste teilen
             </p>
-            <p className="mt-1 text-sm text-stone-600">
+            <p className="mt-1 text-sm text-muted-foreground">
               Mitreisende treten der gemeinsamen Packliste bei — nicht nur der
               Route.
             </p>
@@ -207,7 +207,7 @@ export function TripTeamPanel({
               {copied ? "Link kopiert" : "Person einladen"}
             </Button>
             {trip.inviteValid === false && (
-              <p className="mt-2 text-sm text-rose-700">
+              <p className="mt-2 text-sm text-destructive">
                 {trip.inviteInvalidReason || "Einladung ungültig"}
               </p>
             )}
@@ -216,7 +216,7 @@ export function TripTeamPanel({
                 <button
                   type="button"
                   onClick={() => setInviteOpen((v) => !v)}
-                  className="inline-flex items-center gap-1 text-sm font-semibold text-teal-800"
+                  className="inline-flex items-center gap-1 text-sm font-semibold text-primary"
                 >
                   <ChevronDown
                     className={`h-4 w-4 transition ${inviteOpen ? "rotate-180" : ""}`}
@@ -224,8 +224,8 @@ export function TripTeamPanel({
                   Code & Optionen
                 </button>
                 {inviteOpen && (
-                  <div className="mt-3 space-y-3 border-t border-stone-200 pt-3">
-                    <p className="text-sm text-stone-600">
+                  <div className="mt-3 space-y-3 border-t border-[var(--edge)] pt-3">
+                    <p className="text-sm text-muted-foreground">
                       Code <strong>{trip.inviteCode}</strong>
                       {trip.inviteExpiresAt && (
                         <> · gültig bis {formatDate(trip.inviteExpiresAt)}</>
@@ -284,17 +284,17 @@ export function TripTeamPanel({
             )}
           </div>
 
-          <div className="rounded-2xl border border-stone-200 bg-white p-4 shadow-sm">
-            <p className="flex items-center gap-1.5 text-sm font-semibold text-stone-900">
-              <MapPinned className="h-4 w-4 text-amber-800" />
+          <div className="rounded-2xl border border-[var(--edge)] bg-[var(--glass-thick)] p-4 shadow-sm">
+            <p className="flex items-center gap-1.5 text-sm font-semibold text-foreground">
+              <MapPinned className="h-4 w-4 text-[var(--amber-700)] dark:text-[#fbbf24]" />
               Nur Route als Vorlage
             </p>
-            <p className="mt-1 text-sm text-stone-600">
+            <p className="mt-1 text-sm text-muted-foreground">
               Andere starten eine eigene Reise mit denselben Etappen — ohne
               Packliste, Koffer oder Tipps.
             </p>
             {trip.routeShareCode ? (
-              <p className="mt-2 text-sm text-stone-600">
+              <p className="mt-2 text-sm text-muted-foreground">
                 Code <strong>{trip.routeShareCode}</strong>
                 {trip.routeShareExpiresAt && (
                   <> · gültig bis {formatDate(trip.routeShareExpiresAt)}</>
@@ -308,12 +308,12 @@ export function TripTeamPanel({
                 )}
               </p>
             ) : (
-              <p className="mt-2 text-sm text-stone-500">
+              <p className="mt-2 text-sm text-muted-foreground">
                 Noch kein Route-Code — Besitzer:in kann einen erzeugen.
               </p>
             )}
             {trip.routeShareCode && trip.routeShareValid === false && (
-              <p className="mt-1 text-sm text-rose-700">
+              <p className="mt-1 text-sm text-destructive">
                 {trip.routeShareInvalidReason || "Route-Code ungültig"}
               </p>
             )}

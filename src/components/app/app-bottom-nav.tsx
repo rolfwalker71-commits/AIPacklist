@@ -2,14 +2,15 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Luggage, PlusCircle, UserRound } from "lucide-react";
+import { Luggage, PlusCircle, Sparkles, UserRound } from "lucide-react";
 import { BrandLogo } from "@/components/app/brand-logo";
 import {
-  DesktopPills,
   DockLink,
   FloatingDock,
+  SideLink,
+  SideNav,
+  SideSection,
 } from "@/components/app/floating-dock";
-import { cn } from "@/lib/utils";
 
 const items = [
   { href: "/", label: "Reisen", icon: Luggage, match: (p: string) => p === "/" },
@@ -18,6 +19,12 @@ const items = [
     label: "Neu",
     icon: PlusCircle,
     match: (p: string) => p.startsWith("/create"),
+  },
+  {
+    href: "/tipps",
+    label: "Tipps",
+    icon: Sparkles,
+    match: (p: string) => p.startsWith("/tipps"),
   },
   {
     href: "/profil",
@@ -30,6 +37,11 @@ const items = [
   },
 ] as const;
 
+/**
+ * App-level navigation. Phone gets a floating glass dock at the bottom,
+ * iPad and desktop get a glass sidebar. Trip pages bring their own —
+ * see TripWorkspace — so this renders nothing there.
+ */
 export function AppBottomNav() {
   const pathname = usePathname() || "/";
   if (pathname.startsWith("/trip/") || pathname.startsWith("/login")) {
@@ -38,38 +50,34 @@ export function AppBottomNav() {
 
   return (
     <>
-      <header className="fixed inset-x-0 top-0 z-40 hidden border-b border-stone-200 bg-[#FBF7F0] lg:block">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-3">
-          <Link href="/" className="flex items-center gap-2.5">
-            <BrandLogo className="h-8 w-8" />
-            <span className="font-display text-lg text-stone-950">
-              FlexiPack
-            </span>
-          </Link>
-          <DesktopPills>
-            {items.map((item) => {
-              const Icon = item.icon;
-              const active = item.match(pathname);
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={cn(
-                    "inline-flex h-full min-h-0 items-center gap-1.5 rounded-full px-3.5 py-0 text-sm font-semibold leading-none",
-                    active
-                      ? "bg-white text-teal-900 shadow-sm"
-                      : "bg-transparent text-stone-600 hover:text-stone-900"
-                  )}
-                  aria-current={active ? "page" : undefined}
-                >
-                  <Icon className="size-4" />
-                  {item.label}
-                </Link>
-              );
-            })}
-          </DesktopPills>
-        </div>
-      </header>
+      <SideNav label="Hauptnavigation">
+        <Link
+          href="/"
+          className="mb-3 flex items-center gap-3 rounded-[var(--r-md)] px-3.5 py-2"
+        >
+          <span className="glass glass-thick flex h-10 w-10 items-center justify-center rounded-full">
+            <BrandLogo className="h-7 w-7" />
+          </span>
+          <span className="font-display text-card-title text-foreground">
+            FlexiPack
+          </span>
+        </Link>
+
+        <SideSection>Navigation</SideSection>
+        {items.map((item) => {
+          const Icon = item.icon;
+          return (
+            <SideLink
+              key={item.href}
+              href={item.href}
+              active={item.match(pathname)}
+              icon={<Icon className="size-5 shrink-0" />}
+            >
+              {item.label}
+            </SideLink>
+          );
+        })}
+      </SideNav>
 
       <FloatingDock label="Hauptnavigation">
         {items.map((item) => {

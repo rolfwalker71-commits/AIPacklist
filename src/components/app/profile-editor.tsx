@@ -121,7 +121,7 @@ export function ProfileEditor({
   };
 
   return (
-    <div className="space-y-4 rounded-2xl border border-stone-200 bg-white p-4 shadow-sm">
+    <div className="glass space-y-4 rounded-[var(--r-lg)] p-4">
       <div>
         <Label>Name</Label>
         <Input
@@ -153,7 +153,7 @@ export function ProfileEditor({
             <input
               type="file"
               accept="image/*"
-              className="block w-full text-xs text-stone-600 file:mr-3 file:rounded-lg file:border-0 file:bg-teal-800 file:px-3 file:py-2 file:text-xs file:font-semibold file:text-white"
+              className="block w-full text-xs text-muted-foreground file:mr-3 file:rounded-lg file:border-0 file:bg-teal-800 file:px-3 file:py-2 file:text-xs file:font-semibold file:text-white"
               onChange={(e) => {
                 const file = e.target.files?.[0] ?? null;
                 setPendingAvatar(file);
@@ -170,7 +170,7 @@ export function ProfileEditor({
                 type="button"
                 onClick={removeAvatar}
                 disabled={busy}
-                className="text-xs font-medium text-rose-700 hover:underline disabled:opacity-50"
+                className="text-xs font-medium text-destructive hover:underline disabled:opacity-50"
               >
                 Avatar entfernen
               </button>
@@ -182,10 +182,10 @@ export function ProfileEditor({
         <p
           className={`text-sm font-medium ${
             message === "Gespeichert" || message === "Avatar entfernt"
-              ? "text-teal-800"
+              ? "text-primary"
               : message.includes("gewählt")
-                ? "text-amber-800"
-                : "text-rose-700"
+                ? "text-[var(--amber-700)] dark:text-[#fbbf24]"
+                : "text-destructive"
           }`}
         >
           {message}

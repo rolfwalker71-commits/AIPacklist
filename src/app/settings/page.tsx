@@ -89,35 +89,35 @@ export default function SettingsPage() {
   };
 
   return (
-    <main className="mx-auto max-w-2xl px-4 pb-20 pt-8 lg:max-w-6xl">
-      <Link href="/profil" className="text-base font-semibold text-teal-800">
+    <main className="mx-auto w-full max-w-2xl px-4 pb-20 pt-8 lg:px-8 lg:pt-10">
+      <Link href="/profil" className="text-base font-semibold text-primary">
         ← Profil
       </Link>
       <div className="mt-4 flex items-start gap-3">
-        <Sparkles className="mt-1 h-8 w-8 shrink-0 text-teal-800" />
+        <Sparkles className="mt-1 h-8 w-8 shrink-0 text-primary" />
         <div>
-          <h1 className="font-display text-page-title text-stone-950">
+          <h1 className="font-display text-page-title text-foreground">
             KI-Einstellungen
           </h1>
-          <p className="mt-2 text-base text-stone-600">
+          <p className="mt-2 text-base text-muted-foreground">
             OpenAI steuert Freitext-Erkennung, Packlisten-Verfeinerung und Tipps.
             Ohne Schlüssel fällt FlexiPack auf den Regelparser zurück.
           </p>
         </div>
       </div>
 
-      <div className="card-surface mt-8 space-y-6 p-5">
+      <div className="glass rounded-[var(--r-lg)] mt-8 space-y-6 p-5">
         <div className="flex items-start gap-3">
           {status?.configured ? (
-            <CheckCircle2 className="mt-0.5 h-5 w-5 text-teal-700" />
+            <CheckCircle2 className="mt-0.5 h-5 w-5 text-primary" />
           ) : (
-            <AlertCircle className="mt-0.5 h-5 w-5 text-amber-700" />
+            <AlertCircle className="mt-0.5 h-5 w-5 text-[var(--amber-700)] dark:text-[#fbbf24]" />
           )}
           <div>
-            <div className="font-semibold text-stone-900">
+            <div className="font-semibold text-foreground">
               {status?.configured ? "KI aktiv" : "KI nicht konfiguriert"}
             </div>
-            <p className="text-sm text-stone-600">
+            <p className="text-sm text-muted-foreground">
               Quelle:{" "}
               {status?.source === "env"
                 ? "Umgebung"
@@ -141,7 +141,7 @@ export default function SettingsPage() {
             placeholder="sk-..."
             autoComplete="off"
           />
-          <p className="mt-1 text-xs text-stone-500">
+          <p className="mt-1 text-xs text-muted-foreground">
             Wird unter <code>data/ai-settings.json</code> gespeichert
             (Docker-Volume). Alternativ: Umgebungsvariable{" "}
             <code>OPENAI_API_KEY</code> (hat Vorrang).
@@ -165,15 +165,15 @@ export default function SettingsPage() {
             Schlüssel löschen
           </Button>
         </div>
-        {message && <p className="text-sm text-teal-800">{message}</p>}
-        {status?.note && <p className="text-sm text-amber-800">{status.note}</p>}
+        {message && <p className="text-sm text-primary">{message}</p>}
+        {status?.note && <p className="text-sm text-[var(--amber-700)] dark:text-[#fbbf24]">{status.note}</p>}
       </div>
 
-      <div className="mt-8 rounded-2xl border border-teal-100 bg-teal-50/70 p-5">
-        <div className="mb-2 flex items-center gap-2 font-semibold text-teal-950">
+      <div className="mt-8 rounded-2xl border border-[var(--edge)] bg-[var(--secondary)] p-5">
+        <div className="mb-2 flex items-center gap-2 font-semibold text-foreground">
           <Sparkles className="h-4 w-4" /> Wo die KI hilft
         </div>
-        <ul className="list-disc space-y-1 pl-5 text-sm text-teal-950/80">
+        <ul className="list-disc space-y-1 pl-5 text-sm text-foreground/80">
           {(status?.features || []).map((f) => (
             <li key={f}>{f}</li>
           ))}

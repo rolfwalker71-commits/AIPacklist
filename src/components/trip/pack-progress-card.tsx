@@ -1,5 +1,6 @@
 "use client";
 
+import { Track } from "@/components/ui/glass";
 import { computePackProgress, SHARED_COLOR } from "@/lib/pack-progress";
 
 type MemberUser = {
@@ -34,14 +35,32 @@ type TripLike = {
   items: PackItem[];
 };
 
-function Bar({ pct, color }: { pct: number; color: string }) {
-  return (
-    <div className="h-2 flex-1 overflow-hidden rounded-full bg-stone-200">
-      <div
-        className="h-full rounded-full transition-all duration-500"
-        style={{ width: `${pct}%`, background: color }}
+function Avatar({
+  name,
+  color,
+  avatarUrl,
+}: {
+  name: string;
+  color: string;
+  avatarUrl?: string | null;
+}) {
+  if (avatarUrl) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={avatarUrl}
+        alt=""
+        className="h-8 w-8 shrink-0 rounded-full object-cover ring-2 ring-[rgba(255,255,255,0.65)] dark:ring-[rgba(255,255,255,0.14)]"
       />
-    </div>
+    );
+  }
+  return (
+    <span
+      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white ring-2 ring-[rgba(255,255,255,0.65)] dark:ring-[rgba(255,255,255,0.14)]"
+      style={{ background: color }}
+    >
+      {name.slice(0, 1).toUpperCase()}
+    </span>
   );
 }
 
@@ -50,84 +69,58 @@ export function PackProgressCard({ trip }: { trip: TripLike }) {
   const progress = computePackProgress(trip.items, trip);
   if (progress.total === 0) {
     return (
-      <div className="card-surface p-4 text-sm text-stone-500">
+      <div className="glass rounded-[var(--r-lg)] p-4 text-sm text-muted-foreground">
         Noch keine Packpositionen — Fortschritt erscheint sobald die Liste steht.
       </div>
     );
   }
 
   return (
-    <div className="card-surface space-y-3 p-4">
+    <div className="glass space-y-3 rounded-[var(--r-lg)] p-4">
       <div className="flex items-baseline justify-between gap-2">
-        <h3 className="font-display text-lg text-stone-900">Fortschritt</h3>
-        <span className="text-sm font-semibold text-teal-800">
-          {progress.packed}/{progress.total} · {progress.pct}%
+        <h3 className="font-display text-card-title text-foreground">
+          Fortschritt
+        </h3>
+        <span className="text-sm font-bold text-primary">
+          {progress.packed}/{progress.total} · {progress.pct} %
         </span>
       </div>
-      <Bar pct={progress.pct} color="#0F766E" />
-      <ul className="space-y-2.5">
+      <Track pct={progress.pct} />
+      <ul className="space-y-2.5 sm:grid sm:grid-cols-2 sm:gap-x-5 sm:space-y-0 lg:grid-cols-3">
         {progress.byMember.map((m) => (
-          <li key={m.userId} className="flex items-center gap-2.5">
-            {m.avatarUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={m.avatarUrl}
-                alt=""
-                className="h-8 w-8 rounded-full object-cover"
-              />
-            ) : (
-              <span
-                className="flex h-8 w-8 items-center justify-center rounded-full text-xs font-semibold text-white"
-                style={{ background: m.color }}
-              >
-                {m.name.slice(0, 1).toUpperCase()}
-              </span>
-            )}
+          <li key={m.userId} className="flex items-center gap-2.5 sm:py-1">
+            <Avatar name={m.name} color={m.color} avatarUrl={m.avatarUrl} />
             <div className="min-w-0 flex-1">
               <div className="flex justify-between text-sm">
-                <span className="truncate font-medium text-stone-800">
+                <span className="truncate font-semibold text-foreground">
                   {m.name}
                 </span>
-                <span className="shrink-0 text-stone-500">
+                <span className="shrink-0 text-muted-foreground">
                   {m.total === 0 ? "—" : `${m.packed}/${m.total}`}
                 </span>
               </div>
-              <Bar pct={m.pct} color={m.color} />
+              <Track pct={m.pct} color={m.color} slim className="mt-1" />
             </div>
           </li>
         ))}
         {progress.shared.total > 0 && (
-          <li className="flex items-center gap-2.5">
-            <span
-              className="flex h-8 w-8 items-center justify-center rounded-full text-[10px] font-semibold text-white"
-              style={{ background: SHARED_COLOR }}
-            >
-              G
-            </span>
+          <li className="flex items-center gap-2.5 sm:py-1">
+            <Avatar name="Gemeinsam" color={SHARED_COLOR} />
             <div className="min-w-0 flex-1">
               <div className="flex justify-between text-sm">
-                <span className="font-medium text-stone-800">Gemeinsam</span>
-                <span className="text-stone-500">
+                <span className="truncate font-semibold text-foreground">
+                  Gemeinsam
+                </span>
+                <span className="shrink-0 text-muted-foreground">
                   {progress.shared.packed}/{progress.shared.total}
                 </span>
               </div>
-              <Bar pct={progress.shared.pct} color={SHARED_COLOR} />
-            </div>
-          </li>
-        )}
-        {progress.personal.total > 0 && (
-          <li className="flex items-center gap-2.5">
-            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-stone-400 text-[10px] font-semibold text-white">
-              ?
-            </span>
-            <div className="min-w-0 flex-1">
-              <div className="flex justify-between text-sm">
-                <span className="font-medium text-stone-800">Ohne Zuweisung</span>
-                <span className="text-stone-500">
-                  {progress.personal.packed}/{progress.personal.total}
-                </span>
-              </div>
-              <Bar pct={progress.personal.pct} color="#78716c" />
+              <Track
+                pct={progress.shared.pct}
+                color={SHARED_COLOR}
+                slim
+                className="mt-1"
+              />
             </div>
           </li>
         )}

@@ -20,7 +20,7 @@ export const metadata: Metadata = {
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
-    statusBarStyle: "default",
+    statusBarStyle: "black-translucent",
     title: "FlexiPack",
   },
   icons: {
@@ -36,7 +36,10 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#0F766E",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#f4f2ec" },
+    { media: "(prefers-color-scheme: dark)", color: "#0a1413" },
+  ],
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
@@ -50,27 +53,17 @@ export default async function RootLayout({
   const pathname = (await headers()).get("x-pathname") || "";
   const isLogin = pathname === "/login" || pathname.startsWith("/login?");
   const isTrip = pathname.startsWith("/trip/");
-  const shellPad = isLogin
-    ? ""
-    : isTrip
-      ? ""
-      : "pb-28 lg:pb-8 lg:pt-20";
+
+  // Trip pages carry their own sidebar and dock, so they own their insets.
+  const shellPad = isLogin || isTrip ? "" : "pb-28 pad:pb-8 pad:pl-[17rem]";
 
   return (
-    <html
-      lang="de-CH"
-      className={`${outfit.variable} ${outfit.className}`}
-    >
+    <html lang="de-CH" className={`${outfit.variable} ${outfit.className}`}>
       <body className="font-sans antialiased">
-        <div className={`app-shell min-h-screen ${shellPad}`}>
-          {!isLogin && (
-            <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
-              <div className="absolute -left-24 top-0 h-72 w-72 rounded-full bg-teal-400/25 blur-3xl" />
-              <div className="absolute right-0 top-32 h-96 w-96 rounded-full bg-amber-300/30 blur-3xl" />
-              <div className="absolute bottom-10 left-1/4 h-72 w-72 rounded-full bg-sky-300/25 blur-3xl" />
-              <div className="absolute inset-0 bg-[radial-gradient(circle_at_1px_1px,rgba(28,25,23,0.05)_1px,transparent_0)] bg-[size:20px_20px]" />
-            </div>
-          )}
+        {/* The backdrop every glass surface refracts. */}
+        <div className="ambient-canvas" aria-hidden />
+
+        <div className={`app-shell min-h-[100dvh] ${shellPad}`}>
           {children}
           {!isLogin && (
             <Suspense fallback={null}>

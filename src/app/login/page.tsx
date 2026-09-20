@@ -12,10 +12,11 @@ const ERRORS: Record<string, string> = {
 export const dynamic = "force-dynamic";
 
 const fieldClass =
-  "mt-1.5 flex h-12 w-full rounded-xl border border-stone-300 bg-white px-3.5 text-base text-stone-900";
-const labelClass = "block text-sm font-semibold tracking-wide text-stone-600";
+  "glass glass-thin mt-1.5 flex h-12 w-full rounded-[var(--r-md)] px-3.5 text-base text-foreground backdrop-blur-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
+const labelClass =
+  "block text-sm font-semibold tracking-wide text-muted-foreground";
 const btnClass =
-  "inline-flex h-12 w-full items-center justify-center rounded-xl bg-teal-800 text-base font-semibold text-white";
+  "inline-flex h-12 w-full items-center justify-center rounded-full bg-[linear-gradient(160deg,var(--teal-600),var(--teal-800))] text-base font-semibold text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.42),0_4px_14px_rgba(15,118,110,0.32)] transition active:scale-[0.97]";
 
 export default async function LoginPage({
   searchParams,
@@ -30,12 +31,12 @@ export default async function LoginPage({
 
   return (
     <main className="mx-auto flex min-h-[100dvh] max-w-md items-center px-4 py-12">
-      <div className="card-surface w-full p-6">
+      <div className="glass rounded-[var(--r-lg)] w-full p-6">
         <div className="mb-5 flex items-center gap-3">
           <BrandLogo className="h-12 w-12 shrink-0" />
           <div>
-            <p className="text-eyebrow text-teal-800">FlexiPack</p>
-            <p className="text-sm text-stone-500">Flexible Reise-Packlisten</p>
+            <p className="text-eyebrow text-primary">FlexiPack</p>
+            <p className="text-sm text-muted-foreground">Flexible Reise-Packlisten</p>
           </div>
         </div>
         <TravelMotif className="mb-4 h-20 w-full max-w-[220px] opacity-70" />
@@ -44,10 +45,10 @@ export default async function LoginPage({
           <form action={setupAction} className="space-y-4">
             <input type="hidden" name="next" value={next} />
             <div>
-              <h1 className="font-display text-page-title text-stone-950">
+              <h1 className="font-display text-page-title text-foreground">
                 Admin einrichten
               </h1>
-              <p className="mt-2 text-base text-stone-600">
+              <p className="mt-2 text-base text-muted-foreground">
                 Erstelle den ersten Admin-Account.
               </p>
             </div>
@@ -90,7 +91,7 @@ export default async function LoginPage({
                 minLength={8}
               />
             </div>
-            {error && <p className="text-base text-rose-700">{error}</p>}
+            {error && <p className="text-base text-destructive">{error}</p>}
             <button type="submit" className={btnClass}>
               Admin erstellen & starten
             </button>
@@ -99,10 +100,10 @@ export default async function LoginPage({
           <form action={loginAction} className="space-y-4">
             <input type="hidden" name="next" value={next} />
             <div>
-              <h1 className="font-display text-page-title text-stone-950">
+              <h1 className="font-display text-page-title text-foreground">
                 Anmelden
               </h1>
-              <p className="mt-2 text-base text-stone-600">
+              <p className="mt-2 text-base text-muted-foreground">
                 Nur angelegte Benutzerkonten haben Zugang.
               </p>
             </div>
@@ -132,7 +133,7 @@ export default async function LoginPage({
                 minLength={8}
               />
             </div>
-            {error && <p className="text-base text-rose-700">{error}</p>}
+            {error && <p className="text-base text-destructive">{error}</p>}
             <button type="submit" className={btnClass}>
               Anmelden
             </button>

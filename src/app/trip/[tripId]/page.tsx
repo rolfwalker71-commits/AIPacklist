@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { redirect, notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import {
@@ -38,11 +37,8 @@ export default async function TripPage({
   if (!trip) notFound();
 
   return (
-    <main className="mx-auto max-w-lg px-4 pb-6 pt-4 md:max-w-3xl lg:max-w-6xl md:pt-6">
-      <Link href="/" className="text-sm font-semibold text-teal-800">
-        ← Reisen
-      </Link>
-      <div className="mt-3">
+    <main className="mx-auto w-full max-w-lg px-4 pb-6 pt-6 md:max-w-3xl md:pt-8 lg:max-w-6xl pad:pl-[17rem] pad:pr-6 lg:pr-8">
+      <div>
         <TripWorkspace
           initialTrip={serializeTrip(trip)}
           sessionUser={{

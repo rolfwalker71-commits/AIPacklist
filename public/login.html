@@ -6,16 +6,71 @@
       name="viewport"
       content="width=device-width, initial-scale=1, viewport-fit=cover"
     />
-    <meta name="theme-color" content="#0F766E" />
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f4f2ec" />
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0a1413" />
     <link rel="icon" href="/logo.svg" type="image/svg+xml" />
     <link rel="icon" href="/favicon.png" type="image/png" sizes="32x32" />
     <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
     <link rel="manifest" href="/manifest.webmanifest" />
     <title>FlexiPack</title>
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap"
+    />
     <style>
+      /* Liquid Glass — standalone copy of the app tokens so this page
+         stays free of the bundle (it must load before any JS). */
+      :root {
+        color-scheme: light;
+        --fg: #14201f;
+        --fg-muted: #5c6d6b;
+        --fg-subtle: #7b8c8a;
+        --glass-thin: rgba(255, 255, 255, 0.46);
+        --glass-regular: rgba(255, 255, 255, 0.62);
+        --rim-top: rgba(255, 255, 255, 0.92);
+        --rim-bottom: rgba(255, 255, 255, 0.35);
+        --edge: rgba(20, 32, 31, 0.1);
+        --edge-strong: rgba(20, 32, 31, 0.16);
+        --sheen: linear-gradient(
+          145deg,
+          rgba(255, 255, 255, 0.55) 0%,
+          rgba(255, 255, 255, 0.12) 26%,
+          rgba(255, 255, 255, 0) 52%
+        );
+        --lift-3: 0 6px 16px rgba(11, 61, 57, 0.1),
+          0 20px 56px rgba(11, 61, 57, 0.16);
+        --teal-600: #0d9488;
+        --teal-800: #0f5d57;
+        --danger: #be123c;
+      }
+
+      @media (prefers-color-scheme: dark) {
+        :root {
+          color-scheme: dark;
+          --fg: #eef4f3;
+          --fg-muted: #a6b8b6;
+          --fg-subtle: #7f9290;
+          --glass-thin: rgba(126, 160, 158, 0.15);
+          --glass-regular: rgba(120, 152, 150, 0.2);
+          --rim-top: rgba(255, 255, 255, 0.24);
+          --rim-bottom: rgba(255, 255, 255, 0.06);
+          --edge: rgba(255, 255, 255, 0.1);
+          --edge-strong: rgba(255, 255, 255, 0.18);
+          --sheen: linear-gradient(
+            145deg,
+            rgba(255, 255, 255, 0.16) 0%,
+            rgba(255, 255, 255, 0.04) 28%,
+            rgba(255, 255, 255, 0) 54%
+          );
+          --lift-3: 0 8px 20px rgba(0, 0, 0, 0.45), 0 24px 60px rgba(0, 0, 0, 0.55);
+          --danger: #f43f5e;
+        }
+      }
+
       * {
         box-sizing: border-box;
       }
+
       body {
         margin: 0;
         min-height: 100dvh;
@@ -23,101 +78,219 @@
         align-items: center;
         justify-content: center;
         padding: 1.5rem;
-        font-family: "Segoe UI", Helvetica, Arial, sans-serif;
-        background: linear-gradient(165deg, #fffdf8 0%, #f3faf7 42%, #fbf7f0 100%);
-        color: #1c1917;
+        font-family: Outfit, -apple-system, "SF Pro Text", system-ui,
+          "Segoe UI", Helvetica, Arial, sans-serif;
+        color: var(--fg);
+        -webkit-font-smoothing: antialiased;
+        background: radial-gradient(
+              95% 65% at 6% -8%,
+              rgba(45, 212, 191, 0.34) 0%,
+              transparent 58%
+            ),
+            radial-gradient(
+              80% 55% at 102% 6%,
+              rgba(251, 191, 36, 0.3) 0%,
+              transparent 60%
+            ),
+            radial-gradient(
+              90% 65% at 55% 112%,
+              rgba(56, 189, 248, 0.24) 0%,
+              transparent 62%
+            ),
+            linear-gradient(168deg, #fffdf8 0%, #f2f8f5 46%, #f7f3ec 100%);
       }
+
+      @media (prefers-color-scheme: dark) {
+        body {
+          background: radial-gradient(
+                95% 65% at 6% -8%,
+                rgba(13, 148, 136, 0.42) 0%,
+                transparent 58%
+              ),
+              radial-gradient(
+                80% 55% at 102% 6%,
+                rgba(180, 83, 9, 0.34) 0%,
+                transparent 60%
+              ),
+              radial-gradient(
+                90% 65% at 55% 112%,
+                rgba(14, 116, 144, 0.38) 0%,
+                transparent 62%
+              ),
+              linear-gradient(168deg, #06100f 0%, #0a1918 46%, #0a1412 100%);
+        }
+      }
+
       .card {
+        position: relative;
+        isolation: isolate;
         width: 100%;
         max-width: 26rem;
-        border: 1px solid rgba(28, 25, 23, 0.08);
-        border-radius: 1rem;
-        background: #fff;
-        padding: 1.5rem;
-        box-shadow: 0 10px 30px rgba(28, 25, 23, 0.06);
+        border-radius: 30px;
+        padding: 1.75rem;
+        background: var(--glass-regular);
+        backdrop-filter: blur(30px) saturate(185%);
+        -webkit-backdrop-filter: blur(30px) saturate(185%);
+        box-shadow: inset 0 1px 0 0 var(--rim-top),
+          inset 0 -1px 0 0 var(--rim-bottom), inset 0 0 0 1px var(--edge),
+          var(--lift-3);
       }
+
+      .card::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        z-index: -1;
+        border-radius: inherit;
+        pointer-events: none;
+        background: var(--sheen);
+      }
+
       .brand {
         display: flex;
         align-items: center;
         gap: 0.75rem;
-        margin: 0 0 1rem;
+        margin: 0 0 1.25rem;
       }
+
       .brand img {
-        width: 2.75rem;
-        height: 2.75rem;
+        width: 2.5rem;
+        height: 2.5rem;
       }
+
       .eyebrow {
         margin: 0;
-        font-size: 0.75rem;
+        font-size: 0.7rem;
         font-weight: 700;
-        letter-spacing: 0.16em;
+        letter-spacing: 0.15em;
         text-transform: uppercase;
-        color: #0f766e;
+        color: var(--teal-600);
       }
+
       h1 {
         margin: 0;
-        font-size: 1.875rem;
-        letter-spacing: -0.03em;
+        font-size: 1.85rem;
+        letter-spacing: -0.035em;
+        line-height: 1.1;
         font-weight: 600;
       }
+
       .sub {
         margin: 0.5rem 0 0;
-        color: #57534e;
+        color: var(--fg-muted);
         font-size: 1rem;
       }
+
       label {
         display: block;
-        margin: 1rem 0 0.35rem;
-        font-size: 0.9rem;
+        margin: 1.1rem 0 0.4rem;
+        font-size: 0.88rem;
         font-weight: 600;
         letter-spacing: 0.02em;
-        color: #57534e;
+        color: var(--fg-muted);
       }
+
       input {
         width: 100%;
         height: 3rem;
-        border: 1px solid #d6d3d1;
-        border-radius: 0.75rem;
-        padding: 0 0.85rem;
+        border: 0;
+        border-radius: 16px;
+        padding: 0 0.9rem;
+        font: inherit;
         font-size: 1rem;
-        background: #fff;
+        color: var(--fg);
+        background: var(--glass-thin);
+        backdrop-filter: blur(20px) saturate(185%);
+        -webkit-backdrop-filter: blur(20px) saturate(185%);
+        box-shadow: inset 0 1px 0 var(--rim-top), inset 0 0 0 1px var(--edge);
       }
+
+      input:focus-visible {
+        outline: 2px solid var(--teal-600);
+        outline-offset: 1px;
+      }
+
       button {
-        margin-top: 1.25rem;
+        margin-top: 1.4rem;
         width: 100%;
         height: 3rem;
         border: 0;
-        border-radius: 0.75rem;
-        background: #0f766e;
-        color: #fff;
+        border-radius: 999px;
+        font: inherit;
         font-size: 1rem;
-        font-weight: 700;
+        font-weight: 600;
+        color: #fff;
         cursor: pointer;
+        background: linear-gradient(160deg, var(--teal-600), var(--teal-800));
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.42),
+          inset 0 -1px 0 rgba(0, 0, 0, 0.12), 0 4px 14px rgba(15, 118, 110, 0.32);
+        transition: transform 150ms cubic-bezier(0.2, 0.9, 0.3, 1);
       }
+
       button:active {
-        background: #115e59;
+        transform: scale(0.97);
       }
+
       .err {
-        margin-top: 0.85rem;
-        color: #be123c;
+        margin-top: 0.9rem;
+        color: var(--danger);
         font-size: 0.9rem;
         font-weight: 600;
       }
+
       .hint {
-        margin-top: 0.75rem;
+        margin-top: 0.8rem;
         font-size: 0.8rem;
-        color: #78716c;
+        color: var(--fg-subtle);
       }
+
       .loading {
-        color: #78716c;
+        color: var(--fg-subtle);
         font-size: 0.9rem;
+      }
+
+      /* Reduced transparency / no backdrop-filter: opaque surfaces. */
+      @media (prefers-reduced-transparency: reduce) {
+        .card,
+        input {
+          backdrop-filter: none;
+          -webkit-backdrop-filter: none;
+          background: #fff;
+        }
+        .card::before {
+          display: none;
+        }
+      }
+
+      @supports not (
+        (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))
+      ) {
+        .card {
+          background: rgba(255, 255, 255, 0.96);
+        }
+        input {
+          background: rgba(255, 255, 255, 0.94);
+        }
+      }
+
+      @media (prefers-reduced-transparency: reduce) and (prefers-color-scheme: dark) {
+        .card,
+        input {
+          background: #16211f;
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        button {
+          transition: none;
+        }
       }
     </style>
   </head>
   <body>
     <div class="card">
       <div class="brand">
-        <img src="/logo.svg" alt="FlexiPack" width="44" height="44" />
+        <img src="/logo.svg" alt="FlexiPack" width="40" height="40" />
         <p class="eyebrow">FlexiPack</p>
       </div>
       <div id="root" class="loading">Laden…</div>

@@ -101,7 +101,7 @@ export function DatePicker({
 
   return (
     <div ref={rootRef} className={cn("relative", className)}>
-      <div className="flex h-11 items-center rounded-xl border border-stone-300 bg-white/80 focus-within:ring-2 focus-within:ring-teal-700/30">
+      <div className="flex h-11 items-center rounded-xl border border-[var(--edge-strong)] bg-[var(--glass-thick)] focus-within:ring-2 focus-within:ring-ring">
         <input
           id={inputId}
           inputMode="numeric"
@@ -118,12 +118,12 @@ export function DatePicker({
               setOpen(false);
             }
           }}
-          className="h-full w-full rounded-xl bg-transparent px-3 text-sm text-stone-900 outline-none placeholder:text-stone-400"
+          className="h-full w-full rounded-xl bg-transparent px-3 text-sm text-foreground outline-none placeholder:text-subtle"
           aria-label="Datum (TT.MM.JJJJ)"
         />
         <button
           type="button"
-          className="mr-1 inline-flex h-9 w-9 items-center justify-center rounded-lg text-teal-800 hover:bg-teal-50"
+          className="mr-1 inline-flex h-9 w-9 items-center justify-center rounded-lg text-primary hover:bg-[var(--glass-thin)]"
           onClick={() => setOpen((v) => !v)}
           aria-label="Kalender öffnen"
         >
@@ -132,7 +132,7 @@ export function DatePicker({
       </div>
 
       {open && (
-        <div className="absolute z-50 mt-2 rounded-2xl border border-stone-200 bg-white p-3 shadow-xl">
+        <div className="absolute z-50 mt-2 rounded-2xl border border-[var(--edge)] bg-[var(--glass-thick)] p-3 shadow-xl">
           <DayPicker
             mode="single"
             locale={de}

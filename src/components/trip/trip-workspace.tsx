@@ -12,6 +12,7 @@ import {
   Share2,
   Sparkles,
   Bot,
+  ChevronLeft,
   Clock,
   ListChecks,
   Printer,
@@ -30,11 +31,15 @@ import { SwipeRow } from "@/components/ui/swipe-row";
 import { TravelMotif, SuitcaseCardArt, ChecklistMotif, TipsMotif } from "@/components/app/travel-motif";
 import { BrandLogo } from "@/components/app/brand-logo";
 import {
-  DesktopPill,
-  DesktopPills,
   DockItem,
   FloatingDock,
+  SideButton,
+  SideLink,
+  SideNav,
+  SideSection,
 } from "@/components/app/floating-dock";
+import { Track } from "@/components/ui/glass";
+import { Segment, Segmented } from "@/components/ui/segmented";
 import { AddPackItemForm } from "@/components/trip/add-pack-item-form";
 import { ItemIllustration } from "@/components/trip/item-illustration";
 import { PackAgentPanel } from "@/components/trip/pack-agent-panel";
@@ -193,6 +198,13 @@ const TRANSPORT_OPTIONS: { id: Transport; label: string }[] = [
   { id: "TRAIN", label: "Zug" },
   { id: "OTHER", label: "Sonstiges" },
 ];
+
+/** Glass form control — matches Input/Textarea so selects don't stand out. */
+const selectClass =
+  "glass glass-thin min-w-0 rounded-[var(--r-sm)] px-3 py-2.5 text-base text-foreground backdrop-blur-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
+
+const fieldClass =
+  "glass glass-thin mt-1.5 flex h-12 w-full rounded-[var(--r-md)] px-3 text-base text-foreground backdrop-blur-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
 function emptyInsights(): AiInsights {
   return { tips: [], guides: [], updatedAt: null };
@@ -1372,7 +1384,7 @@ export function TripWorkspace({
           {shown.map((person, i) => (
             <span
               key={person.id}
-              className="relative inline-flex h-7 w-7 items-center justify-center overflow-hidden rounded-full ring-2 ring-white"
+              className="relative inline-flex h-7 w-7 items-center justify-center overflow-hidden rounded-full ring-2 ring-[rgba(255,255,255,0.65)] dark:ring-[rgba(255,255,255,0.14)]"
               style={{
                 marginLeft: i === 0 ? 0 : -8,
                 zIndex: shown.length - i,
@@ -1395,7 +1407,7 @@ export function TripWorkspace({
           ))}
           {extra > 0 && (
             <span
-              className="relative inline-flex h-7 w-7 items-center justify-center rounded-full bg-stone-700 text-[10px] font-bold text-white ring-2 ring-white"
+              className="relative inline-flex h-7 w-7 items-center justify-center rounded-full bg-[var(--teal-900)] text-[10px] font-bold text-white ring-2 ring-[rgba(255,255,255,0.65)] dark:ring-[rgba(255,255,255,0.14)]"
               style={{ marginLeft: -8, zIndex: 0 }}
             >
               +{extra}
@@ -1447,18 +1459,18 @@ export function TripWorkspace({
         ]}
       >
         <li
-          className="card-surface flex list-none flex-col gap-2.5 border px-3.5 py-3.5 transition"
+          className="glass flex list-none flex-col gap-2.5 rounded-[var(--r-md)] px-3 py-3 transition"
           style={tileStyle(color, Boolean(item.packedAt))}
         >
-          <div className="flex min-w-0 items-start gap-2">
+          <div className="flex min-w-0 items-start gap-2.5">
             <button
               type="button"
               onClick={() => void togglePacked(item)}
               className={cn(
-                "flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border",
+                "flex h-10 w-10 shrink-0 items-center justify-center rounded-[var(--r-sm)] transition active:scale-[0.92]",
                 item.packedAt
-                  ? "border-teal-700 bg-teal-700 text-white"
-                  : "border-stone-300/80 bg-white/70 text-transparent"
+                  ? "bg-[linear-gradient(160deg,var(--teal-600),var(--teal-800))] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.40),0_2px_8px_rgba(15,118,110,0.35)]"
+                  : "glass glass-thin text-transparent shadow-[inset_0_1px_0_var(--rim-top),inset_0_0_0_1.5px_var(--edge-strong)]"
               )}
               aria-label={
                 item.packedAt ? "Als offen markieren" : "Als gepackt markieren"
@@ -1471,7 +1483,7 @@ export function TripWorkspace({
               data-no-swipe
               onClick={() => pickItemPhoto(item.id)}
               disabled={photoBusyId === item.id}
-              className="relative h-11 w-11 shrink-0 overflow-hidden rounded-xl border border-stone-200 bg-stone-100"
+              className="glass glass-thin relative h-10 w-10 shrink-0 overflow-hidden rounded-[var(--r-sm)]"
               aria-label={item.photoUrl ? "Foto ändern" : "Eigenes Foto hinzufügen"}
               title={item.photoUrl ? "Foto ändern" : "Eigenes Foto hinzufügen"}
             >
@@ -1486,7 +1498,12 @@ export function TripWorkspace({
               onClick={() => void togglePacked(item)}
               className="min-w-0 flex-1 text-left"
             >
-              <div className="text-card-title font-semibold text-foreground">
+              <div
+                className={cn(
+                  "text-card-title font-semibold text-foreground",
+                  item.packedAt && "line-through opacity-55"
+                )}
+              >
                 {item.quantity}× {item.name}
                 {pLabel && (
                   <Badge
@@ -1527,7 +1544,7 @@ export function TripWorkspace({
               <select
                 data-no-swipe
                 aria-label="Zugewiesen an"
-                className="min-w-0 rounded-xl border border-stone-200 bg-white px-3 py-2.5 text-base"
+                className={selectClass}
                 value={
                   owner.kind === "shared"
                     ? "shared"
@@ -1548,7 +1565,7 @@ export function TripWorkspace({
               <select
                 data-no-swipe
                 aria-label="Koffer"
-                className="min-w-0 rounded-xl border border-stone-200 bg-white px-3 py-2.5 text-base"
+                className={selectClass}
                 value={item.suitcaseId || ""}
                 onChange={(e) => moveSuitcase(item.id, e.target.value)}
               >
@@ -1577,6 +1594,7 @@ export function TripWorkspace({
       icon?: "clock" | "briefcase";
       hint?: string;
       motif?: "day";
+      tint?: "amber" | "teal";
     }
   ) => {
     const open = isSectionOpen(key);
@@ -1584,74 +1602,94 @@ export function TripWorkspace({
     const Icon = opts?.icon === "clock" ? Clock : Briefcase;
     const iconClass =
       opts?.icon === "clock"
-        ? key === DAY_OF_SECTION_KEY
-          ? "text-amber-800"
-          : "text-sky-800"
-        : "text-teal-800";
+        ? "text-[var(--amber-700)] dark:text-[#fbbf24]"
+        : "text-primary";
 
     return (
-      <div key={key} className="card-surface-muted relative overflow-hidden">
+      <div
+        key={key}
+        className={cn(
+          "glass relative overflow-hidden rounded-[var(--r-lg)] p-1.5",
+          opts?.tint === "amber" && "tint-amber",
+          opts?.tint === "teal" && "tint-teal"
+        )}
+      >
         {opts?.motif === "day" && (
           <ChecklistMotif className="pointer-events-none absolute -right-2 top-0 h-16 w-24 opacity-20" />
         )}
         <button
           type="button"
           onClick={() => toggleSection(key)}
-          className="relative flex w-full items-start gap-2 px-3.5 py-3 text-left transition hover:bg-stone-50"
+          className="relative flex w-full items-start gap-2.5 rounded-[var(--r-md)] px-2.5 py-2.5 text-left transition active:scale-[0.99]"
           aria-expanded={open}
         >
-          {open ? (
-            <ChevronDown className="mt-1 h-4 w-4 shrink-0 text-stone-500" />
-          ) : (
-            <ChevronRight className="mt-1 h-4 w-4 shrink-0 text-stone-500" />
-          )}
-          <Icon className={cn("mt-1 h-4 w-4 shrink-0", iconClass)} />
+          <span className="glass glass-thin mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full">
+            <Icon className={cn("h-4 w-4", iconClass)} />
+          </span>
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-              <span className="font-display text-card-title text-stone-900">{title}</span>
-              <span className="text-sm text-stone-500">
+              <span className="font-display text-card-title text-foreground">
+                {title}
+              </span>
+              <span className="text-sm text-muted-foreground">
                 {stats.total} {stats.total === 1 ? "Item" : "Items"}
               </span>
             </div>
-            <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-stone-600">
+            <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
               {stats.openTotal === 0 ? (
-                <span className="font-medium text-teal-800">Alles erledigt</span>
+                <span className="font-semibold text-primary">Alles erledigt</span>
               ) : (
                 stats.buckets.map((b) => (
-                  <span
-                    key={b.key}
-                    className="inline-flex items-center gap-1"
-                  >
+                  <span key={b.key} className="inline-flex items-center gap-1">
                     <span
                       className="h-1.5 w-1.5 rounded-full"
                       style={{ background: b.color }}
                     />
                     {b.label}{" "}
-                    <strong className="text-stone-800">{b.open}</strong> offen
+                    <strong className="text-foreground">{b.open}</strong> offen
                   </span>
                 ))
               )}
             </div>
           </div>
+          {open ? (
+            <ChevronDown className="mt-2 h-4 w-4 shrink-0 text-subtle" />
+          ) : (
+            <ChevronRight className="mt-2 h-4 w-4 shrink-0 text-subtle" />
+          )}
         </button>
         {open && (
-          <div className="relative border-t border-stone-100 px-3 pb-3 pt-2">
+          <div className="relative px-1 pb-1 pt-1">
             {opts?.hint && (
-              <p className="mb-2 text-xs text-stone-500">{opts.hint}</p>
+              <p className="mb-2 px-1.5 text-xs text-muted-foreground">
+                {opts.hint}
+              </p>
             )}
-            <ul className="space-y-2">{items.map(renderItem)}</ul>
+            <ul className="space-y-1.5">{items.map(renderItem)}</ul>
           </div>
         )}
       </div>
     );
   };
 
-  const tabs: { id: TripTab; label: string; icon: typeof ListChecks }[] = [
-    { id: "pack", label: "Pack", icon: ListChecks },
-    { id: "legs", label: "Route", icon: MapPinned },
-    { id: "bags", label: "Koffer", icon: Luggage },
-    { id: "ai", label: "Tipps", icon: Sparkles },
-    { id: "people", label: "Team", icon: Users },
+  const tabs: {
+    id: TripTab;
+    label: string;
+    sideLabel?: string;
+    icon: typeof ListChecks;
+    count?: number;
+  }[] = [
+    {
+      id: "pack",
+      label: "Pack",
+      sideLabel: "Packliste",
+      icon: ListChecks,
+      count: tripOpenStats.openTotal,
+    },
+    { id: "legs", label: "Route", icon: MapPinned, count: trip.legs.length },
+    { id: "bags", label: "Koffer", icon: Luggage, count: trip.suitcases.length },
+    { id: "ai", label: "Tipps", sideLabel: "Tipps & KI", icon: Sparkles },
+    { id: "people", label: "Team", icon: Users, count: trip.members.length },
   ];
 
   const viewingOnePerson = participantFilter.length === 1;
@@ -1695,26 +1733,30 @@ export function TripWorkspace({
             if (viewingOnePerson) return;
             toggleSection(personKey);
           }}
-          className="sticky top-0 z-10 flex min-h-11 w-full items-center gap-2 rounded-2xl bg-stone-50 px-2 py-2 text-left"
+          className="glass glass-thick sticky top-2 z-10 flex min-h-12 w-full items-center gap-2.5 rounded-full px-2.5 py-2 text-left"
           aria-expanded={personOpen}
         >
-          {!viewingOnePerson &&
-            (personOpen ? (
-              <ChevronDown className="h-4 w-4 shrink-0 text-stone-500" />
-            ) : (
-              <ChevronRight className="h-4 w-4 shrink-0 text-stone-500" />
-            ))}
           <span
-            className="h-3 w-3 shrink-0 rounded-full"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white ring-2 ring-[rgba(255,255,255,0.65)] dark:ring-[rgba(255,255,255,0.14)]"
             style={{ background: group.color }}
             aria-hidden
-          />
-          <h3 className="font-display text-section-title text-foreground">
-            {group.label}
-          </h3>
-          <p className="text-sm text-muted-foreground">
-            {open} offen · {group.items.length} Positionen
-          </p>
+          >
+            {group.label.slice(0, 1).toUpperCase()}
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block truncate font-display text-card-title text-foreground">
+              {group.label}
+            </span>
+            <span className="block text-xs text-muted-foreground">
+              {open} offen · {group.items.length} Positionen
+            </span>
+          </span>
+          {!viewingOnePerson &&
+            (personOpen ? (
+              <ChevronDown className="mr-1 h-4 w-4 shrink-0 text-subtle" />
+            ) : (
+              <ChevronRight className="mr-1 h-4 w-4 shrink-0 text-subtle" />
+            ))}
         </button>
         {personOpen && (
           <>
@@ -1725,6 +1767,7 @@ export function TripWorkspace({
                 early,
                 {
                   icon: "clock",
+                  tint: "teal",
                   hint: "Formulare, Visa und Co. — besser Tage oder Wochen vorher.",
                 }
               )}
@@ -1744,6 +1787,7 @@ export function TripWorkspace({
                 {
                   icon: "clock",
                   motif: "day",
+                  tint: "amber",
                   hint: "Bordkarte, Schlüssel, Geldbörse — kurz vor dem Losfahren abhaken.",
                 }
               )}
@@ -1754,50 +1798,118 @@ export function TripWorkspace({
   };
 
   return (
-    <div className="space-y-6 pb-28 lg:pb-8">
-      <header className="card-surface space-y-3 p-4 md:p-5">
+    <div className="space-y-5 pb-28 pad:pb-8">
+      {/* iPad / desktop: the trip owns the sidebar while you are inside it. */}
+      <SideNav label="Reise-Bereiche">
+        <Link
+          href="/"
+          className="mb-2 flex items-center gap-2.5 rounded-[var(--r-md)] px-3.5 py-2 text-sm font-semibold text-muted-foreground transition hover:text-foreground"
+        >
+          <ChevronLeft className="h-4 w-4 shrink-0" />
+          Alle Reisen
+        </Link>
+
+        <div className="glass mx-1 mb-3 rounded-[var(--r-lg)] p-3.5">
+          <p className="text-eyebrow text-subtle">Aktuelle Reise</p>
+          <p className="mt-1.5 font-display text-card-title leading-tight text-foreground">
+            {trip.title}
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {formatDate(trip.startDate)} – {formatDate(trip.endDate)}
+          </p>
+          <div className="mt-3 flex items-center gap-2.5">
+            <Track pct={progress} slim className="flex-1" />
+            <span className="shrink-0 text-xs font-bold text-subtle">
+              {progress} %
+            </span>
+          </div>
+        </div>
+
+        <SideSection>Bereiche</SideSection>
+        {tabs.map((tab) => {
+          const Icon = tab.icon;
+          return (
+            <SideButton
+              key={tab.id}
+              active={activeTab === tab.id}
+              onClick={() => setTab(tab.id)}
+              icon={<Icon className="size-5 shrink-0" />}
+              count={tab.count}
+            >
+              {tab.sideLabel ?? tab.label}
+            </SideButton>
+          );
+        })}
+
+        {ownerGroups.length > 0 && (
+          <>
+            <SideSection>Personen</SideSection>
+            {ownerGroups.map((group) => {
+              const openCount = group.items.filter((i) => !i.packedAt).length;
+              const only =
+                participantFilter.length === 1 &&
+                participantFilter[0] === group.key;
+              return (
+                <SideButton
+                  key={group.key}
+                  active={only}
+                  onClick={() => {
+                    setTab("pack");
+                    setParticipantFilter(only ? [] : [group.key]);
+                  }}
+                  icon={
+                    <span
+                      className="h-5 w-5 shrink-0 rounded-full ring-2 ring-[rgba(255,255,255,0.55)] dark:ring-[rgba(255,255,255,0.12)]"
+                      style={{ background: group.color }}
+                      aria-hidden
+                    />
+                  }
+                  count={openCount > 0 ? `${openCount} offen` : "fertig"}
+                >
+                  {group.label}
+                </SideButton>
+              );
+            })}
+          </>
+        )}
+
+        <div className="mt-auto pt-3">
+          <SideLink
+            href={`/trip/${trip.id}/print`}
+            icon={<Printer className="size-5 shrink-0" />}
+          >
+            Liste drucken
+          </SideLink>
+        </div>
+      </SideNav>
+
+      <header className="glass space-y-3 rounded-[var(--r-lg)] p-4 md:p-5">
         <div className="flex items-start gap-3">
-          <BrandLogo className="mt-0.5 h-11 w-11 shrink-0" />
+          <Link href="/" className="pad:hidden" aria-label="Zurück zu den Reisen">
+            <span className="glass glass-thick mt-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-full">
+              <ChevronLeft className="h-5 w-5 text-foreground" />
+            </span>
+          </Link>
+          <BrandLogo className="mt-0.5 hidden h-11 w-11 shrink-0 pad:block" />
           <div className="min-w-0 flex-1">
-            <p className="text-eyebrow text-amber-800">FlexiPack-Reise</p>
-            <h1 className="font-display text-page-title text-stone-950">
+            <p className="text-eyebrow text-[var(--amber-700)] dark:text-[#fbbf24]">
+              FlexiPack-Reise
+            </p>
+            <h1 className="font-display text-page-title text-foreground">
               {trip.title}
             </h1>
-            <p className="mt-1 text-base text-stone-600">
+            <p className="mt-1 text-base text-muted-foreground">
               {formatDate(trip.startDate)} – {formatDate(trip.endDate)} ·{" "}
               {trip.legs.length} Etappen · {progress}% gepackt
             </p>
           </div>
         </div>
 
-        <div className="h-2.5 overflow-hidden rounded-full bg-stone-200">
-          <div
-            className="h-full rounded-full bg-teal-700 transition-all duration-500"
-            style={{ width: `${progress}%` }}
-          />
-        </div>
+        <Track pct={progress} />
 
-        <div className="hidden lg:block">
-          <DesktopPills>
-            {tabs.map((tab) => {
-              const Icon = tab.icon;
-              return (
-                <DesktopPill
-                  key={tab.id}
-                  active={activeTab === tab.id}
-                  onClick={() => setTab(tab.id)}
-                >
-                  <Icon className="size-4" />
-                  {tab.label}
-                </DesktopPill>
-              );
-            })}
-          </DesktopPills>
-        </div>
-
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2 pad:hidden">
           <Link href={`/trip/${trip.id}/print`}>
-            <Button type="button" variant="outline" size="sm">
+            <Button type="button" variant="secondary" size="sm">
               <Printer className="h-3.5 w-3.5" />
               Liste drucken
             </Button>
@@ -1807,7 +1919,7 @@ export function TripWorkspace({
         <button
           type="button"
           onClick={() => setHeaderDetails((v) => !v)}
-          className="inline-flex items-center gap-1.5 text-sm font-semibold text-teal-800"
+          className="inline-flex items-center gap-1.5 text-sm font-semibold text-primary"
         >
           <ChevronDown
             className={cn(
@@ -1819,14 +1931,14 @@ export function TripWorkspace({
         </button>
 
         {headerDetails && (
-          <div className="space-y-3 border-t border-stone-200/80 pt-3">
+          <div className="space-y-3 border-t border-[var(--edge)] pt-3">
             <Button variant="outline" className="w-full sm:w-auto" onClick={copyEinladung}>
               <Share2 className="h-4 w-4" />
               {copied ? "Kopiert" : `Einladung ${trip.inviteCode}`}
             </Button>
-            <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-base text-stone-600">
+            <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-base text-muted-foreground">
               <span>
-                <strong className="text-stone-900">{tripOpenStats.total}</strong>{" "}
+                <strong className="text-foreground">{tripOpenStats.total}</strong>{" "}
                 Items
               </span>
               {tripOpenStats.openTotal > 0 ? (
@@ -1834,7 +1946,7 @@ export function TripWorkspace({
                   {tripOpenStats.buckets.map((b) => (
                     <span
                       key={b.key}
-                      className="inline-flex items-center gap-1.5 rounded-full border border-stone-200 bg-white px-2.5 py-1 text-sm"
+                      className="glass glass-thin inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-sm"
                       title={`${b.label}: ${b.open} offen`}
                     >
                       <span
@@ -1843,17 +1955,17 @@ export function TripWorkspace({
                       />
                       <span>
                         {b.label}{" "}
-                        <strong className="text-stone-800">{b.open}</strong>
+                        <strong className="text-foreground">{b.open}</strong>
                       </span>
                     </span>
                   ))}
                 </span>
               ) : (
-                <span className="font-semibold text-teal-800">Alles erledigt</span>
+                <span className="font-semibold text-primary">Alles erledigt</span>
               )}
             </div>
             {aiMessage && (
-              <p className="rounded-xl border border-teal-100 bg-teal-50 px-3 py-2.5 text-base text-teal-950">
+              <p className="glass tint-teal rounded-[var(--r-md)] px-3.5 py-2.5 text-base text-foreground">
                 {aiMessage}
               </p>
             )}
@@ -1861,7 +1973,7 @@ export function TripWorkspace({
         )}
 
         {!headerDetails && aiMessage && (
-          <p className="rounded-xl border border-teal-100 bg-teal-50 px-3 py-2.5 text-base text-teal-950">
+          <p className="glass tint-teal rounded-[var(--r-md)] px-3.5 py-2.5 text-base text-foreground">
             {aiMessage}
           </p>
         )}
@@ -1869,14 +1981,35 @@ export function TripWorkspace({
 
       {activeTab === "pack" && (
         <section className="space-y-4">
-          <div className="relative overflow-hidden rounded-[1.75rem] bg-gradient-to-br from-teal-900 via-teal-800 to-teal-700 px-4 py-5 text-teal-50 shadow-md">
-            <ChecklistMotif className="absolute -right-1 bottom-0 h-24 w-36 opacity-40" />
-            <p className="text-eyebrow text-teal-100/80">Packliste</p>
-            <h2 className="mt-1 font-display text-section-title">Was noch fehlt?</h2>
-            <p className="mt-1 max-w-[20rem] text-base text-teal-50/85">
-              Persönliche Dinge pro Person — gemeinsam nur was wirklich geteilt wird.
-              Der Agent prüft Lücken und fragt nach, bevor er schreibt.
-            </p>
+          <div className="hero-panel px-5 py-5">
+            <ChecklistMotif className="absolute -right-1 bottom-0 h-24 w-36 opacity-35" />
+            <div className="relative flex flex-wrap items-end justify-between gap-4">
+              <div>
+                <p className="text-eyebrow text-[rgba(209,250,229,0.82)]">
+                  Packliste
+                </p>
+                <h2 className="mt-1 font-display text-section-title">
+                  {tripOpenStats.openTotal === 0
+                    ? "Alles gepackt"
+                    : `Noch ${tripOpenStats.openTotal} offen`}
+                </h2>
+                <p className="mt-1 max-w-[22rem] text-sm text-[rgba(236,253,245,0.86)]">
+                  Persönliches pro Person, gemeinsam nur was wirklich geteilt
+                  wird.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  className="border-none bg-[rgba(255,255,255,0.18)] text-[#effefb] shadow-[inset_0_1px_0_rgba(255,255,255,0.30),inset_0_0_0_1px_rgba(255,255,255,0.20)]"
+                  onClick={() => setAgentOpen(true)}
+                >
+                  <Bot className="h-4 w-4" />
+                  Agent fragen
+                </Button>
+              </div>
+            </div>
           </div>
 
           <PackProgressCard trip={trip} />
@@ -1886,8 +2019,8 @@ export function TripWorkspace({
               className={cn(
                 "rounded-xl border px-3 py-2.5 text-sm",
                 !isOnline
-                  ? "border-amber-200 bg-amber-50 text-amber-950"
-                  : "border-teal-100 bg-teal-50 text-teal-950"
+                  ? "glass tint-amber text-foreground"
+                  : "glass tint-teal text-foreground"
               )}
               role="status"
             >
@@ -1935,69 +2068,78 @@ export function TripWorkspace({
             </Card>
           )}
 
-          <Card>
-            <CardContent className="space-y-3 p-3.5">
+          {/* One glass toolbar instead of three stacked filter rows. */}
+          <div className="glass sticky top-2 z-20 space-y-2.5 rounded-[var(--r-lg)] p-2.5">
             <div className="flex flex-wrap items-center gap-2">
-              {(
-                [
-                  ["all", "Alle"],
-                  ["open", "Offen"],
-                  ["packed", "Gepackt"],
-                  ["shared", "Gemeinsam"],
-                ] as const
-              ).map(([id, label]) => (
-                <Button
-                  key={id}
-                  type="button"
-                  size="sm"
-                  variant={filter === id ? "default" : "outline"}
-                  onClick={() => setFilter(id)}
-                  aria-pressed={filter === id}
-                >
-                  {label}
-                </Button>
-              ))}
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <select
-                className="min-w-0 flex-1 rounded-xl border border-stone-200 bg-white px-3 py-2.5 text-base"
-                value={suitcaseFilter}
-                onChange={(e) => setSuitcaseFilter(e.target.value)}
-              >
-                <option value="all">Alle Koffer</option>
-                {trip.suitcases.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name}
-                  </option>
+              <Segmented label="Packliste filtern" className="min-w-0 flex-1 sm:flex-none">
+                {(
+                  [
+                    ["open", "Offen", tripOpenStats.openTotal],
+                    ["all", "Alle", null],
+                    ["packed", "Gepackt", null],
+                    ["shared", "Gemeinsam", null],
+                  ] as const
+                ).map(([id, label, count]) => (
+                  <Segment
+                    key={id}
+                    active={filter === id}
+                    onClick={() => setFilter(id)}
+                  >
+                    {label}
+                    {count != null && count > 0 && (
+                      <Badge variant="warning" className="px-1.5 py-0">
+                        {count}
+                      </Badge>
+                    )}
+                  </Segment>
                 ))}
-              </select>
-              <Button
-                type="button"
-                variant="secondary"
-                size="sm"
-                onClick={() => setAgentOpen(true)}
-              >
-                <Bot className="h-4 w-4" />
-                Agent
-              </Button>
-              <Button
-                type="button"
-                variant="secondary"
-                size="sm"
-                onClick={enrichWithAi}
-                disabled={aiBusy}
-              >
-                <Sparkles className="h-4 w-4" />
-                {aiBusy ? "KI…" : "KI"}
-              </Button>
+              </Segmented>
+              <div className="ml-auto flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => setAgentOpen(true)}
+                >
+                  <Bot className="h-4 w-4" />
+                  Agent
+                </Button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={enrichWithAi}
+                  disabled={aiBusy}
+                >
+                  <Sparkles className="h-4 w-4" />
+                  {aiBusy ? "KI…" : "KI"}
+                </Button>
+              </div>
             </div>
-            <ParticipantFilter
-              options={participantOptions}
-              selected={participantFilter}
-              onChange={setParticipantFilter}
-            />
-            </CardContent>
-          </Card>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <ParticipantFilter
+                options={participantOptions}
+                selected={participantFilter}
+                onChange={setParticipantFilter}
+              />
+              {trip.suitcases.length > 0 && (
+                <select
+                  aria-label="Koffer filtern"
+                  className={cn(selectClass, "h-9 py-0 text-sm")}
+                  value={suitcaseFilter}
+                  onChange={(e) => setSuitcaseFilter(e.target.value)}
+                >
+                  <option value="all">Alle Koffer</option>
+                  {trip.suitcases.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+          </div>
 
           <AddPackItemForm
             tripId={trip.id}
@@ -2074,11 +2216,11 @@ export function TripWorkspace({
 
       {activeTab === "legs" && (
         <section className="space-y-4">
-          <div className="relative overflow-hidden rounded-[1.75rem] bg-gradient-to-br from-amber-700 via-amber-600 to-teal-700 px-4 py-5 text-amber-50 shadow-md">
+          <div className="hero-panel px-5 py-6" style={{ background: "linear-gradient(150deg, rgba(180,83,9,0.90), rgba(217,119,6,0.74) 52%, rgba(15,118,110,0.62))" }}>
             <TravelMotif className="absolute -right-2 bottom-0 h-28 w-44 opacity-45" />
-            <p className="text-eyebrow text-amber-100/85">Route</p>
+            <p className="text-eyebrow text-[rgba(254,243,199,0.85)]">Route</p>
             <h2 className="mt-1 font-display text-section-title">Etappen der Reise</h2>
-            <p className="mt-1 max-w-md text-base text-amber-50/90">
+            <p className="mt-1 max-w-md text-base text-[rgba(255,251,235,0.90)]">
               Orte, Transport und Wetter — getrennt von der Packliste.
             </p>
           </div>
@@ -2095,7 +2237,7 @@ export function TripWorkspace({
             </Button>
           </div>
           <div className="space-y-2">
-            <h3 className="font-display text-section-title text-stone-900">Etappen</h3>
+            <h3 className="font-display text-section-title text-foreground">Etappen</h3>
             <ul className="space-y-2">
               {trip.legs.map((leg) => {
                 const actions = [
@@ -2118,20 +2260,20 @@ export function TripWorkspace({
                 ];
                 return (
                   <SwipeRow key={leg.id} actions={actions}>
-                    <li className="card-surface list-none bg-gradient-to-br from-teal-50 to-white px-4 py-3.5">
-                      <div className="text-sm font-semibold uppercase tracking-wide text-teal-800">
+                    <li className="glass tint-teal list-none rounded-[var(--r-lg)] px-4 py-3.5">
+                      <div className="text-sm font-semibold uppercase tracking-wide text-primary">
                         {TRANSPORT_LABELS[leg.transport] || leg.transport}
                       </div>
-                      <h4 className="mt-0.5 text-card-title font-semibold text-stone-900">
+                      <h4 className="mt-0.5 text-card-title font-semibold text-foreground">
                         {leg.name}
                       </h4>
                       {leg.location && (
-                        <p className="text-base text-stone-600">{leg.location}</p>
+                        <p className="text-base text-muted-foreground">{leg.location}</p>
                       )}
-                      <p className="mt-1 text-sm text-stone-500">
+                      <p className="mt-1 text-sm text-muted-foreground">
                         {formatDate(leg.startDate)} – {formatDate(leg.endDate)}
                       </p>
-                      <p className="mt-1 text-sm text-stone-600">
+                      <p className="mt-1 text-sm text-muted-foreground">
                         Wäsche: {leg.laundryAvailable ? "Ja" : "Nein"}
                         {(leg.weatherTags || []).length > 0
                           ? ` · ${(leg.weatherTags || [])
@@ -2176,7 +2318,7 @@ export function TripWorkspace({
 
             {editingLegId && (
               <div className="card-surface p-4">
-                <h4 className="font-display text-section-title text-stone-900">
+                <h4 className="font-display text-section-title text-foreground">
                   Etappe ändern
                 </h4>
                 <div className="mt-3 grid gap-3 sm:grid-cols-2">
@@ -2211,8 +2353,8 @@ export function TripWorkspace({
                           className={cn(
                             "rounded-full border px-2.5 py-1 text-xs font-medium",
                             legDraft.location === preset
-                              ? "border-teal-700 bg-teal-50 text-teal-900"
-                              : "border-stone-200 bg-stone-50 text-stone-600"
+                              ? "glass tint-teal text-foreground shadow-[inset_0_0_0_1.5px_var(--primary)]"
+                              : "border-[var(--edge)] bg-[var(--glass-thin)] text-muted-foreground"
                           )}
                         >
                           {preset}
@@ -2242,7 +2384,7 @@ export function TripWorkspace({
                     <Label htmlFor="leg-transport">Transport</Label>
                     <select
                       id="leg-transport"
-                      className="mt-1 h-11 w-full rounded-xl border border-stone-300 bg-white/80 px-3 text-sm"
+                      className="glass glass-thin mt-1 h-11 w-full rounded-[var(--r-sm)] px-3 text-sm text-foreground"
                       value={legDraft.transport}
                       onChange={(e) =>
                         setLegDraft((d) => ({
@@ -2259,7 +2401,7 @@ export function TripWorkspace({
                     </select>
                   </div>
                   <div className="flex items-end pb-1">
-                    <label className="inline-flex items-center gap-2 text-sm text-stone-700">
+                    <label className="inline-flex items-center gap-2 text-sm text-muted-foreground">
                       <input
                         type="checkbox"
                         checked={legDraft.laundryAvailable}
@@ -2269,7 +2411,7 @@ export function TripWorkspace({
                             laundryAvailable: e.target.checked,
                           }))
                         }
-                        className="h-4 w-4 rounded border-stone-300"
+                        className="h-4 w-4 rounded border-[var(--edge-strong)]"
                       />
                       Wäsche verfügbar
                     </label>
@@ -2296,8 +2438,8 @@ export function TripWorkspace({
                             className={cn(
                               "rounded-full border px-2.5 py-1 text-xs font-medium",
                               on
-                                ? "border-teal-700 bg-teal-50 text-teal-900"
-                                : "border-stone-200 bg-stone-50 text-stone-600"
+                                ? "glass tint-teal text-foreground shadow-[inset_0_0_0_1.5px_var(--primary)]"
+                                : "border-[var(--edge)] bg-[var(--glass-thin)] text-muted-foreground"
                             )}
                           >
                             {WEATHER_TAG_LABELS[tag]}
@@ -2333,7 +2475,7 @@ export function TripWorkspace({
                     Speichern & KI neu berechnen
                   </Button>
                 </div>
-                <p className="mt-2 text-sm text-stone-500">
+                <p className="mt-2 text-sm text-muted-foreground">
                   Speichern aktualisiert Daten/Destination. Mit KI werden Packliste,
                   Koffer-Zuweisung und Tipps an die neue Route angepasst.
                 </p>
@@ -2345,11 +2487,11 @@ export function TripWorkspace({
 
       {activeTab === "bags" && (
         <section className="space-y-4">
-          <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-teal-900 via-teal-800 to-teal-700 px-4 py-5 text-teal-50 shadow-md">
+          <div className="hero-panel px-5 py-6">
             <SuitcaseCardArt className="absolute -right-2 -top-1 h-24 w-36 opacity-50" />
-            <p className="text-eyebrow text-teal-100/80">Übersicht</p>
+            <p className="text-eyebrow text-[rgba(209,250,229,0.82)]">Übersicht</p>
             <h2 className="mt-1 font-display text-section-title">Was liegt wo?</h2>
-            <p className="mt-1 max-w-md text-base text-teal-50/85">
+            <p className="mt-1 max-w-md text-base text-[rgba(236,253,245,0.86)]">
               Name, Grösse und Zuweisung jederzeit ändern — tippe einen Koffer.
             </p>
           </div>
@@ -2375,7 +2517,7 @@ export function TripWorkspace({
                 );
               }}
             >
-              <p className="text-eyebrow text-teal-800">Neuer Koffer</p>
+              <p className="text-eyebrow text-primary">Neuer Koffer</p>
               <div>
                 <Label htmlFor="bag-name-new">Bezeichnung</Label>
                 <Input
@@ -2394,7 +2536,7 @@ export function TripWorkspace({
                   <Label htmlFor="bag-size-new">Grösse</Label>
                   <select
                     id="bag-size-new"
-                    className="mt-1.5 flex h-12 w-full rounded-xl border border-stone-300 bg-white px-3 text-base"
+                    className={fieldClass}
                     value={bagForm.size}
                     onChange={(e) =>
                       setBagForm((f) => ({ ...f, size: e.target.value }))
@@ -2411,7 +2553,7 @@ export function TripWorkspace({
                   <Label htmlFor="bag-assignee-new">Zugewiesen an</Label>
                   <select
                     id="bag-assignee-new"
-                    className="mt-1.5 flex h-12 w-full rounded-xl border border-stone-300 bg-white px-3 text-base"
+                    className={fieldClass}
                     value={bagForm.assignee}
                     onChange={(e) =>
                       setBagForm((f) => ({ ...f, assignee: e.target.value }))
@@ -2478,10 +2620,10 @@ export function TripWorkspace({
                       accent={accent}
                     />
                     <div className="min-w-0 flex-1">
-                      <div className="font-display text-lg text-stone-900">
+                      <div className="font-display text-lg text-foreground">
                         {s.name}
                       </div>
-                      <div className="text-sm text-stone-500">
+                      <div className="text-sm text-muted-foreground">
                         {SUITCASE_SIZES.find((x) => x.id === s.size)?.label ||
                           s.size}
                         {s.isShared
@@ -2493,7 +2635,7 @@ export function TripWorkspace({
                         {packed}/{bagItems.length} gepackt
                         {overloaded ? ` · knapp (~${softMax})` : ""}
                       </div>
-                      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-stone-200">
+                      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[var(--edge-strong)]">
                         <div
                           className="h-full rounded-full transition-all"
                           style={{
@@ -2504,16 +2646,16 @@ export function TripWorkspace({
                       </div>
                     </div>
                     {expanded ? (
-                      <ChevronDown className="h-4 w-4 text-stone-400" />
+                      <ChevronDown className="h-4 w-4 text-subtle" />
                     ) : (
-                      <ChevronRight className="h-4 w-4 text-stone-400" />
+                      <ChevronRight className="h-4 w-4 text-subtle" />
                     )}
                   </button>
                   {expanded && (
-                    <div className="space-y-3 border-t border-stone-100 px-3 pb-3 pt-3">
+                    <div className="space-y-3 border-t border-[var(--edge)] px-3 pb-3 pt-3">
                       {editingThis ? (
                         <form
-                          className="space-y-3 rounded-xl border border-teal-200 bg-teal-50/40 p-3"
+                          className="glass tint-teal space-y-3 rounded-[var(--r-md)] p-3"
                           onSubmit={(e) => {
                             e.preventDefault();
                             void saveSuitcase({
@@ -2530,7 +2672,7 @@ export function TripWorkspace({
                             );
                           }}
                         >
-                          <p className="text-eyebrow text-teal-800">
+                          <p className="text-eyebrow text-primary">
                             Koffer bearbeiten
                           </p>
                           <div>
@@ -2556,7 +2698,7 @@ export function TripWorkspace({
                               <Label htmlFor={`bag-size-${s.id}`}>Grösse</Label>
                               <select
                                 id={`bag-size-${s.id}`}
-                                className="mt-1.5 flex h-12 w-full rounded-xl border border-stone-300 bg-white px-3 text-base"
+                                className={fieldClass}
                                 value={bagForm.size}
                                 onChange={(e) =>
                                   setBagForm((f) => ({
@@ -2578,7 +2720,7 @@ export function TripWorkspace({
                               </Label>
                               <select
                                 id={`bag-assignee-${s.id}`}
-                                className="mt-1.5 flex h-12 w-full rounded-xl border border-stone-300 bg-white px-3 text-base"
+                                className={fieldClass}
                                 value={bagForm.assignee}
                                 onChange={(e) =>
                                   setBagForm((f) => ({
@@ -2654,7 +2796,7 @@ export function TripWorkspace({
                       {bagItems.length === 0 ? (
                         <div className="py-4 text-center">
                           <ChecklistMotif className="mx-auto h-16 w-24 opacity-80" />
-                          <p className="mt-1 text-sm text-stone-500">
+                          <p className="mt-1 text-sm text-muted-foreground">
                             Noch leer — weise Items in der Packliste zu.
                           </p>
                         </div>
@@ -2676,8 +2818,8 @@ export function TripWorkspace({
                                   className={cn(
                                     "flex w-full items-center gap-2 rounded-xl px-2 py-2 text-left text-sm",
                                     item.packedAt
-                                      ? "bg-teal-50/70 text-stone-500 line-through"
-                                      : "bg-stone-50 text-stone-800"
+                                      ? "bg-[var(--glass-thin)] text-muted-foreground line-through"
+                                      : "bg-[var(--glass-thin)] text-foreground"
                                   )}
                                 >
                                   <span
@@ -2685,12 +2827,12 @@ export function TripWorkspace({
                                       "flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border",
                                       item.packedAt
                                         ? "border-teal-700 bg-teal-700 text-white"
-                                        : "border-stone-300 bg-white text-transparent"
+                                        : "text-transparent shadow-[inset_0_0_0_1.5px_var(--edge-strong)]"
                                     )}
                                   >
                                     <Check className="h-3.5 w-3.5" />
                                   </span>
-                                  <span className="h-7 w-7 shrink-0 overflow-hidden rounded-lg border border-stone-200 bg-stone-100">
+                                  <span className="h-7 w-7 shrink-0 overflow-hidden rounded-lg border border-[var(--edge)] bg-[var(--glass-thin)]">
                                     <ItemIllustration
                                       name={item.name}
                                       category={item.category}
@@ -2700,7 +2842,7 @@ export function TripWorkspace({
                                   <span className="min-w-0 flex-1">
                                     {item.quantity}× {item.name}
                                     {open > 0 && !item.packedAt ? (
-                                      <span className="ml-1 text-[10px] font-semibold uppercase text-amber-800">
+                                      <span className="ml-1 text-[10px] font-semibold uppercase text-[var(--amber-700)] dark:text-[#fbbf24]">
                                         offen
                                       </span>
                                     ) : null}
@@ -2711,7 +2853,7 @@ export function TripWorkspace({
                         </ul>
                       )}
                       {idx === 0 && bagItems.length > 0 && !editingThis && (
-                        <p className="text-xs text-stone-400">
+                        <p className="text-xs text-subtle">
                           Tippe eine Zeile, um gepackt/offen umzuschalten.
                         </p>
                       )}
@@ -2726,11 +2868,11 @@ export function TripWorkspace({
 
       {activeTab === "ai" && (
         <section className="space-y-5">
-          <div className="relative overflow-hidden rounded-[1.75rem] bg-gradient-to-br from-teal-900 via-teal-800 to-amber-700 px-4 py-5 text-teal-50 shadow-md">
+          <div className="hero-panel px-5 py-6" style={{ background: "linear-gradient(150deg, rgba(11,61,57,0.92), rgba(15,118,110,0.76) 52%, rgba(180,83,9,0.62))" }}>
             <TipsMotif className="absolute -right-1 bottom-0 h-28 w-40 opacity-50" />
-            <p className="text-eyebrow text-teal-100/80">KI & Ratgeber</p>
+            <p className="text-eyebrow text-[rgba(209,250,229,0.82)]">KI & Ratgeber</p>
             <h2 className="mt-1 font-display text-section-title">Tipps zur Reise</h2>
-            <p className="mt-1 max-w-md text-base text-teal-50/85">
+            <p className="mt-1 max-w-md text-base text-[rgba(236,253,245,0.86)]">
               Packliste verfeinern, Guides und Do&apos;s/Don&apos;ts — gespeichert
               auf dieser Reise.
             </p>
@@ -2762,7 +2904,7 @@ export function TripWorkspace({
               Nach Routenänderung neu berechnen
             </Button>
           </div>
-          <p className="text-sm text-stone-500">
+          <p className="text-sm text-muted-foreground">
             «Neu berechnen» ergänzt fehlende Positionen, weist Koffer nach Kapazität
             zu und aktualisiert die Reisetipps — z.B. nach geänderten Etappen.
           </p>
@@ -2770,10 +2912,10 @@ export function TripWorkspace({
           {!hasInsights ? (
             <div className="card-surface p-6 text-center">
               <TipsMotif className="mx-auto mb-3 h-28 w-auto max-w-[240px] opacity-90" />
-              <p className="font-medium text-stone-800">
+              <p className="font-medium text-foreground">
                 Noch keine AI-Infos gespeichert
               </p>
-              <p className="mt-1 text-sm text-stone-500">
+              <p className="mt-1 text-sm text-muted-foreground">
                 Verfeinere die Packliste oder generiere Reisetipps — sie bleiben
                 auf dieser Reise gespeichert.
               </p>
@@ -2783,10 +2925,10 @@ export function TripWorkspace({
               {insights.tips.length > 0 && (
                 <div className="card-surface relative overflow-hidden p-4">
                   <TipsMotif className="pointer-events-none absolute -right-2 -top-1 h-20 w-28 opacity-25" />
-                  <h3 className="relative font-display text-lg text-stone-900">
+                  <h3 className="relative font-display text-lg text-foreground">
                     Tipps
                   </h3>
-                  <ul className="relative mt-2 list-disc space-y-1.5 pl-5 text-sm text-stone-700">
+                  <ul className="relative mt-2 list-disc space-y-1.5 pl-5 text-sm text-muted-foreground">
                     {insights.tips.map((tip) => (
                       <li key={tip}>{tip}</li>
                     ))}
@@ -2795,19 +2937,19 @@ export function TripWorkspace({
               )}
               {insights.guides.length > 0 && (
                 <div className="space-y-4">
-                  <h3 className="font-display text-lg text-stone-900">Guides</h3>
+                  <h3 className="font-display text-lg text-foreground">Guides</h3>
                   {insights.guides.map((guide) => (
                     <article
                       key={`${guide.title}-${guide.body.slice(0, 24)}`}
                       className="card-surface px-4 py-3"
                     >
-                      <h4 className="font-semibold text-stone-900">
+                      <h4 className="font-semibold text-foreground">
                         {guide.title}
                       </h4>
                       {guide.body.split(/\n+/).map((para, idx) => (
                         <p
                           key={idx}
-                          className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-stone-600"
+                          className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground"
                         >
                           {para}
                         </p>
@@ -2817,7 +2959,7 @@ export function TripWorkspace({
                 </div>
               )}
               {insights.updatedAt && (
-                <p className="text-xs text-stone-400">
+                <p className="text-xs text-subtle">
                   Aktualisiert: {formatDate(insights.updatedAt)}
                 </p>
               )}

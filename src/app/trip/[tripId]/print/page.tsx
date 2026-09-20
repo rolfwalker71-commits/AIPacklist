@@ -36,11 +36,13 @@ export default async function TripPrintPage({
   return (
     <main className="mx-auto max-w-3xl px-4 py-6 print:max-w-none print:px-0">
       <div className="mb-4 print:hidden">
-        <Link href={`/trip/${tripId}`} className="text-sm font-semibold text-teal-800">
+        <Link href={`/trip/${tripId}`} className="text-sm font-semibold text-primary">
           ← Zurück zur Reise
         </Link>
       </div>
-      <PrintTripView trip={serializeTrip(trip)} />
+      <div className="paper p-5 print:p-0">
+        <PrintTripView trip={serializeTrip(trip)} />
+      </div>
     </main>
   );
 }

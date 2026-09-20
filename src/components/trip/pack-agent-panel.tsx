@@ -161,7 +161,7 @@ export function PackAgentPanel({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-stone-950/40 p-3 sm:items-center"
+      className="fixed inset-0 z-50 flex items-end justify-center bg-[rgba(6,16,15,0.45)] p-3 backdrop-blur-sm sm:items-center"
       role="dialog"
       aria-modal="true"
       aria-labelledby="pack-agent-title"
@@ -170,21 +170,21 @@ export function PackAgentPanel({
       }}
     >
       <div
-        className="flex max-h-[min(36rem,85vh)] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-stone-200 bg-[#FBF7F0]"
+        className="flex max-h-[min(36rem,85vh)] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-[var(--edge)] bg-[#FBF7F0]"
         style={{
           paddingBottom: "max(0.25rem, env(safe-area-inset-bottom))",
         }}
       >
-        <header className="flex items-center gap-2 border-b border-stone-200 px-3.5 py-3">
-          <Bot className="h-5 w-5 shrink-0 text-teal-800" aria-hidden />
+        <header className="flex items-center gap-2 border-b border-[var(--edge)] px-3.5 py-3">
+          <Bot className="h-5 w-5 shrink-0 text-primary" aria-hidden />
           <div className="min-w-0 flex-1">
             <h2
               id="pack-agent-title"
-              className="text-base font-semibold text-stone-900"
+              className="text-base font-semibold text-foreground"
             >
               Pack-Agent
             </h2>
-            <p className="text-sm text-stone-500">
+            <p className="text-sm text-muted-foreground">
               Prüft die Liste und schreibt erst nach Bestätigung.
             </p>
           </div>
@@ -206,8 +206,8 @@ export function PackAgentPanel({
               className={cn(
                 "max-w-[92%] rounded-2xl px-3.5 py-2.5 text-base leading-snug",
                 line.role === "user"
-                  ? "ml-auto bg-teal-800 text-teal-50"
-                  : "bg-white text-stone-800 ring-1 ring-stone-200"
+                  ? "ml-auto bg-[linear-gradient(160deg,var(--teal-600),var(--teal-800))] text-white"
+                  : "bg-[var(--glass-thick)] text-foreground ring-1 ring-[var(--edge)]"
               )}
             >
               {line.text}
@@ -215,7 +215,7 @@ export function PackAgentPanel({
           ))}
 
           {busy && (
-            <p className="text-sm text-stone-500" role="status">
+            <p className="text-sm text-muted-foreground" role="status">
               Prüfe die Packliste…
             </p>
           )}
@@ -225,20 +225,20 @@ export function PackAgentPanel({
               {drafts.map((draft) => (
                 <li
                   key={draft.id}
-                  className="rounded-2xl border border-stone-200 bg-white p-3"
+                  className="rounded-2xl border border-[var(--edge)] bg-[var(--glass-thick)] p-3"
                 >
                   <div className="flex items-start gap-2.5">
-                    <span className="h-11 w-11 shrink-0 overflow-hidden rounded-xl border border-stone-200 bg-stone-100">
+                    <span className="h-11 w-11 shrink-0 overflow-hidden rounded-xl border border-[var(--edge)] bg-[var(--glass-thin)]">
                       <ItemIllustration
                         name={draft.name}
                         category={draft.category}
                       />
                     </span>
                     <div className="min-w-0 flex-1">
-                      <p className="text-base font-semibold text-stone-900">
+                      <p className="text-base font-semibold text-foreground">
                         {draft.quantity}× {draft.name}
                       </p>
-                      <p className="text-sm text-stone-500">{draft.reason}</p>
+                      <p className="text-sm text-muted-foreground">{draft.reason}</p>
                     </div>
                   </div>
                   <div className="mt-2.5 flex flex-wrap gap-1.5">
@@ -250,8 +250,8 @@ export function PackAgentPanel({
                           "min-h-10 rounded-full px-3 text-sm font-semibold",
                           draft.scope === "person" &&
                             draft.ownerUserId === m.user.id
-                            ? "bg-muted text-teal-900"
-                            : "bg-stone-100 text-stone-600"
+                            ? "bg-muted text-primary"
+                            : "bg-[var(--glass-thin)] text-muted-foreground"
                         )}
                         onClick={() =>
                           setDraft(draft.id, {
@@ -269,8 +269,8 @@ export function PackAgentPanel({
                         className={cn(
                           "min-h-10 rounded-full px-3 text-sm font-semibold",
                           draft.scope === "both"
-                            ? "bg-muted text-teal-900"
-                            : "bg-stone-100 text-stone-600"
+                            ? "bg-muted text-primary"
+                            : "bg-[var(--glass-thin)] text-muted-foreground"
                         )}
                         onClick={() =>
                           setDraft(draft.id, {
@@ -287,8 +287,8 @@ export function PackAgentPanel({
                       className={cn(
                         "min-h-10 rounded-full px-3 text-sm font-semibold",
                         draft.scope === "shared"
-                          ? "bg-muted text-teal-900"
-                          : "bg-stone-100 text-stone-600"
+                          ? "bg-muted text-primary"
+                          : "bg-[var(--glass-thin)] text-muted-foreground"
                       )}
                       onClick={() =>
                         setDraft(draft.id, {
@@ -333,7 +333,7 @@ export function PackAgentPanel({
           )}
         </div>
 
-        <footer className="space-y-2 border-t border-stone-200 px-3.5 py-3">
+        <footer className="space-y-2 border-t border-[var(--edge)] px-3.5 py-3">
           {drafts.length > 1 && (
             <Button
               type="button"

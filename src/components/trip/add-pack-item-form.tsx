@@ -148,20 +148,20 @@ export function AddPackItemForm({
   return (
     <form
       onSubmit={submit}
-      className="space-y-3 rounded-2xl border border-teal-200/80 bg-white/90 p-4 shadow-sm"
+      className="space-y-3 rounded-2xl border border-[var(--edge)]/80 bg-[var(--glass-thick)]/90 p-4 shadow-sm"
     >
       <div className="flex items-start justify-between gap-2">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-teal-800">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">
             Neue Position
           </p>
-          <p className="mt-0.5 text-xs text-stone-500">
+          <p className="mt-0.5 text-xs text-muted-foreground">
             Koffer später zuweisen. Kategorie wird aus dem Text vorgeschlagen.
           </p>
         </div>
         <button
           type="button"
-          className="text-xs font-semibold text-stone-500 hover:text-stone-800"
+          className="text-xs font-semibold text-muted-foreground hover:text-foreground"
           onClick={() => {
             reset();
             setOpen(false);
@@ -188,7 +188,7 @@ export function AddPackItemForm({
           <Label htmlFor="pack-item-assignee">Zugewiesen an</Label>
           <select
             id="pack-item-assignee"
-            className="mt-1.5 flex h-10 w-full rounded-xl border border-stone-200 bg-white px-3 text-sm"
+            className="mt-1.5 flex h-10 w-full rounded-xl border border-[var(--edge)] bg-[var(--glass-thick)] px-3 text-sm"
             value={assignee}
             onChange={(e) => setAssignee(e.target.value)}
           >
@@ -217,7 +217,7 @@ export function AddPackItemForm({
         <Label htmlFor="pack-item-category">Kategorie</Label>
         <select
           id="pack-item-category"
-          className="mt-1.5 flex h-10 w-full rounded-xl border border-stone-200 bg-white px-3 text-sm"
+          className="mt-1.5 flex h-10 w-full rounded-xl border border-[var(--edge)] bg-[var(--glass-thick)] px-3 text-sm"
           value={categoryChoice}
           onChange={(e) => setCategoryChoice(e.target.value)}
         >
@@ -242,13 +242,13 @@ export function AddPackItemForm({
           />
         )}
         {categoryChoice === AUTO && name.trim() && (
-          <p className="mt-1.5 text-xs text-stone-500">
+          <p className="mt-1.5 text-xs text-muted-foreground">
             Vorschlag aus Regeln: <strong>{suggested}</strong>
           </p>
         )}
       </div>
 
-      {error && <p className="text-sm text-rose-700">{error}</p>}
+      {error && <p className="text-sm text-destructive">{error}</p>}
 
       <div className="flex flex-wrap gap-2">
         <Button type="submit" disabled={busy}>

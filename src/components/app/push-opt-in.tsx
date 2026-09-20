@@ -129,7 +129,7 @@ export function PushOptInCard() {
 
   if (!supported) {
     return (
-      <div className="rounded-xl border border-stone-200 bg-stone-50 px-3 py-3 text-sm text-stone-600">
+      <div className="rounded-xl border border-[var(--edge)] bg-[var(--glass-thin)] px-3 py-3 text-sm text-muted-foreground">
         Push wird von diesem Browser nicht unterstützt. Auf dem iPhone: App zum
         Home-Bildschirm legen (iOS 16.4+).
       </div>
@@ -145,11 +145,11 @@ export function PushOptInCard() {
   }
 
   return (
-    <div className="space-y-2 rounded-xl border border-teal-100 bg-teal-50/40 px-3 py-3">
-      <p className="text-sm font-semibold text-stone-900">
+    <div className="space-y-2 rounded-xl border border-[var(--edge)] bg-[var(--secondary)] px-3 py-3">
+      <p className="text-sm font-semibold text-foreground">
         Gruppen-Benachrichtigungen
       </p>
-      <p className="text-xs text-stone-600">
+      <p className="text-xs text-muted-foreground">
         Meilensteine (50 %/100 %), Beitritte, Routenänderungen und neue Tipps —
         mit FlexiPack-Motif-Karten. Nicht bei jedem Abhaken.
       </p>
@@ -178,11 +178,11 @@ export function PushOptInCard() {
         )}
       </div>
       {subscribed && (
-        <p className="text-xs text-teal-900">
+        <p className="text-xs text-primary">
           Aktiv{devices > 1 ? ` · ${devices} Geräte` : ""}
         </p>
       )}
-      {message && <p className="text-xs text-stone-600">{message}</p>}
+      {message && <p className="text-xs text-muted-foreground">{message}</p>}
     </div>
   );
 }

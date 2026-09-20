@@ -22,7 +22,7 @@ export function GenderPicker({
   return (
     <div>
       <Label>{label}</Label>
-      <p className="mb-2 text-xs text-stone-500">
+      <p className="mb-2 text-xs text-muted-foreground">
         Beeinflusst persönliche Kleidung und Abendgarderobe — freiwillig.
       </p>
       <div className="flex flex-wrap gap-2">
@@ -35,7 +35,7 @@ export function GenderPicker({
               "rounded-xl border px-3 py-2 text-sm font-medium transition",
               value === opt.id
                 ? "border-teal-800 bg-teal-800 text-white"
-                : "border-stone-200 bg-white text-stone-700 hover:border-teal-300"
+                : "border-[var(--edge)] bg-[var(--glass-thick)] text-muted-foreground hover:border-[var(--primary)]"
             )}
           >
             {opt.label}

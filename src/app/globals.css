@@ -1,29 +1,132 @@
 @import "tailwindcss";
 
+/* =============================================================
+   FlexiPack — Liquid Glass design system
+   Tokens are theme-aware: every value below has a dark twin in
+   the `prefers-color-scheme: dark` block further down.
+   ============================================================= */
+
 :root {
-  --background: #fbf7f0;
-  --foreground: #1c1917;
-  --card: #fffdf9;
-  --card-foreground: #1c1917;
-  --popover: #fffdf9;
-  --popover-foreground: #1c1917;
+  color-scheme: light;
+
+  /* --- Brand --- */
+  --teal-900: #0b3d39;
+  --teal-800: #0f5d57;
+  --teal-700: #0f766e;
+  --teal-600: #0d9488;
+  --teal-400: #2dd4bf;
+  --amber-700: #b45309;
+  --amber-500: #f59e0b;
+
+  /* --- Content --- */
+  --background: #f4f2ec;
+  --foreground: #14201f;
+  --muted-foreground: #5c6d6b;
+  --subtle-foreground: #7b8c8a;
+
   --primary: #0f766e;
   --primary-foreground: #f0fdfa;
-  --secondary: #ccfbf1;
-  --secondary-foreground: #134e4a;
-  --muted: #f5f0e6;
-  --muted-foreground: #57534e;
-  --accent: #ccfbf1;
-  --accent-foreground: #134e4a;
+  --secondary: rgba(45, 212, 191, 0.26);
+  --secondary-foreground: #0b3d39;
+  --accent: rgba(251, 191, 36, 0.28);
+  --accent-foreground: #78350f;
   --destructive: #be123c;
-  --border: rgba(28, 25, 23, 0.12);
-  --input: rgba(28, 25, 23, 0.18);
-  --ring: rgba(15, 118, 110, 0.45);
-  --teal: #0f766e;
-  --sand: #fbf7f0;
-  --ink: #1c1917;
-  --amber: #b45309;
-  --card-border: rgba(28, 25, 23, 0.1);
+  --destructive-foreground: #fff1f2;
+
+  /* --- Liquid Glass materials ---
+     Four thicknesses. Thinner = more of the backdrop shows through. */
+  --glass-ultrathin: rgba(255, 255, 255, 0.30);
+  --glass-thin: rgba(255, 255, 255, 0.46);
+  --glass-regular: rgba(255, 255, 255, 0.62);
+  --glass-thick: rgba(255, 255, 255, 0.80);
+  --glass-blur: 30px;
+  --glass-saturate: 185%;
+
+  /* --- Specular highlight + edges ---
+     The rim is what makes glass read as glass: a bright top edge
+     where light catches, a dimmer bottom bounce, a hairline outline. */
+  --rim-top: rgba(255, 255, 255, 0.92);
+  --rim-bottom: rgba(255, 255, 255, 0.35);
+  --edge: rgba(20, 32, 31, 0.10);
+  --edge-strong: rgba(20, 32, 31, 0.16);
+  --sheen: linear-gradient(
+    145deg,
+    rgba(255, 255, 255, 0.55) 0%,
+    rgba(255, 255, 255, 0.12) 26%,
+    rgba(255, 255, 255, 0) 52%
+  );
+
+  /* --- Elevation --- */
+  --lift-1: 0 1px 2px rgba(11, 61, 57, 0.05), 0 4px 14px rgba(11, 61, 57, 0.06);
+  --lift-2: 0 2px 6px rgba(11, 61, 57, 0.07), 0 10px 32px rgba(11, 61, 57, 0.10);
+  --lift-3: 0 6px 16px rgba(11, 61, 57, 0.10), 0 20px 56px rgba(11, 61, 57, 0.16);
+
+  /* --- Tinted glass --- */
+  --tint-amber: linear-gradient(150deg, rgba(251, 191, 36, 0.30), rgba(255, 255, 255, 0.52));
+  --tint-teal: linear-gradient(150deg, rgba(45, 212, 191, 0.26), rgba(255, 255, 255, 0.52));
+  --tint-rose: linear-gradient(150deg, rgba(244, 63, 94, 0.20), rgba(255, 255, 255, 0.52));
+
+  /* --- Concentric radii --- */
+  --r-xl: 30px;
+  --r-lg: 22px;
+  --r-md: 16px;
+  --r-sm: 12px;
+
+  /* shadcn-compatible aliases used by existing components */
+  --card: var(--glass-regular);
+  --card-foreground: var(--foreground);
+  --popover: var(--glass-thick);
+  --popover-foreground: var(--foreground);
+  --muted: var(--glass-thin);
+  --border: var(--edge);
+  --input: var(--edge-strong);
+  --ring: rgba(15, 118, 110, 0.50);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+
+    --background: #0a1413;
+    --foreground: #eef4f3;
+    --muted-foreground: #a6b8b6;
+    --subtle-foreground: #7f9290;
+
+    --primary: #2dd4bf;
+    --primary-foreground: #04201d;
+    --secondary: rgba(13, 148, 136, 0.30);
+    --secondary-foreground: #ccfbf1;
+    --accent: rgba(180, 83, 9, 0.30);
+    --accent-foreground: #fde68a;
+    --destructive: #f43f5e;
+    --destructive-foreground: #1a0309;
+
+    --glass-ultrathin: rgba(126, 160, 158, 0.10);
+    --glass-thin: rgba(126, 160, 158, 0.15);
+    --glass-regular: rgba(120, 152, 150, 0.20);
+    --glass-thick: rgba(18, 32, 31, 0.74);
+
+    --rim-top: rgba(255, 255, 255, 0.24);
+    --rim-bottom: rgba(255, 255, 255, 0.06);
+    --edge: rgba(255, 255, 255, 0.10);
+    --edge-strong: rgba(255, 255, 255, 0.18);
+    --sheen: linear-gradient(
+      145deg,
+      rgba(255, 255, 255, 0.16) 0%,
+      rgba(255, 255, 255, 0.04) 28%,
+      rgba(255, 255, 255, 0) 54%
+    );
+
+    --lift-1: 0 1px 2px rgba(0, 0, 0, 0.35), 0 4px 14px rgba(0, 0, 0, 0.30);
+    --lift-2: 0 2px 6px rgba(0, 0, 0, 0.40), 0 12px 34px rgba(0, 0, 0, 0.42);
+    --lift-3: 0 8px 20px rgba(0, 0, 0, 0.45), 0 24px 60px rgba(0, 0, 0, 0.55);
+
+    --tint-amber: linear-gradient(150deg, rgba(217, 119, 6, 0.24), rgba(126, 160, 158, 0.13));
+    --tint-teal: linear-gradient(150deg, rgba(13, 148, 136, 0.30), rgba(126, 160, 158, 0.13));
+    --tint-rose: linear-gradient(150deg, rgba(225, 29, 72, 0.24), rgba(126, 160, 158, 0.13));
+
+    --ring: rgba(45, 212, 191, 0.55);
+  }
 }
 
 @theme inline {
@@ -39,150 +142,434 @@
   --color-secondary-foreground: var(--secondary-foreground);
   --color-muted: var(--muted);
   --color-muted-foreground: var(--muted-foreground);
+  --color-subtle: var(--subtle-foreground);
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
-  --font-sans: var(--font-outfit), "Segoe UI", Helvetica, Arial, sans-serif;
+  --font-sans: var(--font-outfit), -apple-system, "SF Pro Text", system-ui, sans-serif;
+
+  /* Tablet breakpoint: the width at which the sidebar replaces the dock.
+     736px catches every iPad in portrait (iPad mini is 744pt, the 11" is
+     834pt); Tailwind's own `lg` at 1024px would leave them on the phone
+     layout. Media-query rem is always 16px, independent of html font-size. */
+  --breakpoint-pad: 46rem;
 }
 
+/* =============================================================
+   Base
+   ============================================================= */
+
 html {
-  font-size: 112.5%;
+  font-size: 106.25%; /* 17px — iOS body size */
+  -webkit-text-size-adjust: 100%;
+  /* Only the root paints a base colour — the body must stay transparent
+     so .ambient-canvas (z-index -10) is visible behind every surface. */
+  background: var(--background);
 }
 
 html,
 body {
-  background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-outfit), "Segoe UI", Helvetica, Arial, sans-serif;
+  font-family: var(--font-outfit), -apple-system, "SF Pro Text", system-ui, sans-serif;
   line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
   -webkit-tap-highlight-color: transparent;
+  overscroll-behavior-y: none;
 }
 
-.font-display {
-  font-family: var(--font-outfit), "Segoe UI", Helvetica, Arial, sans-serif;
-  font-weight: 600;
-  letter-spacing: -0.03em;
+/* =============================================================
+   Ambient canvas — the backdrop the glass refracts.
+   Fixed, behind everything, and it is what makes translucency read.
+   ============================================================= */
+
+.ambient-canvas {
+  position: fixed;
+  inset: 0;
+  z-index: -10;
+  pointer-events: none;
+  background:
+    radial-gradient(95% 65% at 6% -8%, rgba(45, 212, 191, 0.34) 0%, transparent 58%),
+    radial-gradient(80% 55% at 102% 6%, rgba(251, 191, 36, 0.30) 0%, transparent 60%),
+    radial-gradient(90% 65% at 55% 112%, rgba(56, 189, 248, 0.24) 0%, transparent 62%),
+    linear-gradient(168deg, #fffdf8 0%, #f2f8f5 46%, #f7f3ec 100%);
 }
 
-/* Page / section titles — prefer these over one-off sizes */
-.text-page-title {
-  font-size: 1.875rem; /* 30px */
-  line-height: 1.15;
+.ambient-canvas::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(
+    circle at 1px 1px,
+    rgba(20, 32, 31, 0.055) 1px,
+    transparent 0
+  );
+  background-size: 22px 22px;
 }
-@media (min-width: 768px) {
-  .text-page-title {
-    font-size: 2.25rem; /* 36px */
+
+@media (prefers-color-scheme: dark) {
+  .ambient-canvas {
+    background:
+      radial-gradient(95% 65% at 6% -8%, rgba(13, 148, 136, 0.42) 0%, transparent 58%),
+      radial-gradient(80% 55% at 102% 6%, rgba(180, 83, 9, 0.34) 0%, transparent 60%),
+      radial-gradient(90% 65% at 55% 112%, rgba(14, 116, 144, 0.38) 0%, transparent 62%),
+      linear-gradient(168deg, #06100f 0%, #0a1918 46%, #0a1412 100%);
+  }
+  .ambient-canvas::after {
+    background-image: radial-gradient(
+      circle at 1px 1px,
+      rgba(255, 255, 255, 0.05) 1px,
+      transparent 0
+    );
   }
 }
 
+/* =============================================================
+   The glass primitive
+   ============================================================= */
+
+.glass {
+  position: relative;
+  border-radius: var(--r-lg);
+  background: var(--glass-regular);
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  box-shadow:
+    inset 0 1px 0 0 var(--rim-top),
+    inset 0 -1px 0 0 var(--rim-bottom),
+    inset 0 0 0 1px var(--edge),
+    var(--lift-1);
+  isolation: isolate;
+}
+
+/* The lensed sheen sweeping the top-left — sits behind content. */
+.glass::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  pointer-events: none;
+  background: var(--sheen);
+}
+
+.glass-ultrathin { background: var(--glass-ultrathin); }
+.glass-thin { background: var(--glass-thin); }
+.glass-thick {
+  background: var(--glass-thick);
+  box-shadow:
+    inset 0 1px 0 0 var(--rim-top),
+    inset 0 0 0 1px var(--edge),
+    var(--lift-2);
+}
+
+.glass-raised {
+  box-shadow:
+    inset 0 1px 0 0 var(--rim-top),
+    inset 0 -1px 0 0 var(--rim-bottom),
+    inset 0 0 0 1px var(--edge),
+    var(--lift-2);
+}
+.glass-float {
+  box-shadow:
+    inset 0 1px 0 0 var(--rim-top),
+    inset 0 -1px 0 0 var(--rim-bottom),
+    inset 0 0 0 1px var(--edge),
+    var(--lift-3);
+}
+
+/* Outline emphasis for a selected / focused pane */
+.glass-selected {
+  box-shadow:
+    inset 0 1px 0 0 var(--rim-top),
+    inset 0 0 0 1.5px var(--primary),
+    var(--lift-1);
+}
+
+.glass-dashed {
+  background: var(--glass-thin);
+  box-shadow: inset 0 0 0 1.5px var(--edge-strong), var(--lift-1);
+}
+
+.tint-amber { background: var(--tint-amber); }
+.tint-teal { background: var(--tint-teal); }
+.tint-rose { background: var(--tint-rose); }
+
+/* Interactive glass — presses like a gel button */
+.glass-press {
+  transition: transform 160ms cubic-bezier(0.2, 0.9, 0.3, 1),
+    box-shadow 160ms ease;
+}
+.glass-press:active {
+  transform: scale(0.975);
+}
+
+/* =============================================================
+   Accessibility fallbacks
+   ============================================================= */
+
+/* Reduced transparency: swap translucency for opaque surfaces so
+   text contrast never depends on what is behind the pane. */
+@media (prefers-reduced-transparency: reduce) {
+  :root {
+    --glass-ultrathin: #ffffff;
+    --glass-thin: #ffffff;
+    --glass-regular: #ffffff;
+    --glass-thick: #ffffff;
+    --sheen: none;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --glass-ultrathin: #16211f;
+      --glass-thin: #16211f;
+      --glass-regular: #16211f;
+      --glass-thick: #101a19;
+    }
+  }
+  .glass,
+  .glass-thick {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+  .ambient-canvas { opacity: 0.35; }
+}
+
+/* No backdrop-filter support → opaque surfaces, same reasoning. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  :root {
+    --glass-ultrathin: rgba(255, 255, 255, 0.92);
+    --glass-thin: rgba(255, 255, 255, 0.94);
+    --glass-regular: rgba(255, 255, 255, 0.96);
+    --glass-thick: rgba(255, 255, 255, 0.99);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --glass-ultrathin: rgba(22, 33, 31, 0.92);
+      --glass-thin: rgba(22, 33, 31, 0.94);
+      --glass-regular: rgba(22, 33, 31, 0.96);
+      --glass-thick: rgba(16, 26, 25, 0.99);
+    }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* =============================================================
+   Typography scale
+   ============================================================= */
+
+.font-display {
+  font-family: var(--font-outfit), -apple-system, "SF Pro Display", system-ui, sans-serif;
+  font-weight: 600;
+  letter-spacing: -0.035em;
+  line-height: 1.1;
+}
+
+.text-page-title {
+  font-size: 1.8rem;
+  line-height: 1.12;
+}
+@media (min-width: 768px) {
+  .text-page-title { font-size: 2.15rem; }
+}
+
 .text-section-title {
-  font-size: 1.375rem; /* 22px */
-  line-height: 1.25;
+  font-size: 1.3rem;
+  line-height: 1.22;
 }
 
 .text-card-title {
-  font-size: 1.125rem; /* 18px */
+  font-size: 1.06rem;
   line-height: 1.3;
 }
 
 .text-eyebrow {
-  font-size: 0.75rem;
+  font-size: 0.68rem;
   font-weight: 700;
-  letter-spacing: 0.16em;
+  letter-spacing: 0.15em;
   text-transform: uppercase;
 }
 
-.app-shell {
-  background: linear-gradient(165deg, #fffdf8 0%, #f3faf7 42%, #fbf7f0 100%);
-}
+/* =============================================================
+   Shared pieces
+   ============================================================= */
 
+/* Progress track */
+.track {
+  height: 0.5rem;
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--edge-strong);
+  box-shadow: inset 0 1px 2px rgba(20, 32, 31, 0.10);
+}
+.track > span {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--teal-600), var(--teal-400));
+  box-shadow: 0 0 12px rgba(45, 212, 191, 0.50);
+  transition: width 480ms cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+.track-slim { height: 0.35rem; }
+
+/* Safe-area helpers for the floating bars */
+.pad-bottom-safe { padding-bottom: max(0.75rem, env(safe-area-inset-bottom)); }
+.pad-top-safe { padding-top: max(0.75rem, env(safe-area-inset-top)); }
+
+/* Legacy aliases — existing markup still references these. */
 .card-surface {
-  background: var(--card);
-  border: 1px solid var(--card-border);
-  border-radius: 1.25rem;
-  box-shadow: 0 1px 2px rgba(28, 25, 23, 0.04);
+  position: relative;
+  border-radius: var(--r-lg);
+  background: var(--glass-regular);
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  box-shadow:
+    inset 0 1px 0 0 var(--rim-top),
+    inset 0 -1px 0 0 var(--rim-bottom),
+    inset 0 0 0 1px var(--edge),
+    var(--lift-1);
 }
-
 .card-surface-muted {
-  background: rgba(255, 252, 247, 0.72);
-  border: 1px solid rgba(28, 25, 23, 0.08);
-  border-radius: 1.25rem;
+  position: relative;
+  border-radius: var(--r-lg);
+  background: var(--glass-thin);
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  box-shadow:
+    inset 0 1px 0 0 var(--rim-top),
+    inset 0 0 0 1px var(--edge);
 }
-
 .hero-panel {
   position: relative;
   overflow: hidden;
-  border-radius: 1.75rem;
-  background: linear-gradient(145deg, #134e4a 0%, #0f766e 48%, #0d9488 100%);
-  color: #f0fdfa;
-  box-shadow: 0 12px 28px rgba(15, 118, 110, 0.22);
+  border-radius: var(--r-xl);
+  background: linear-gradient(
+    150deg,
+    rgba(15, 93, 87, 0.90),
+    rgba(13, 148, 136, 0.74) 56%,
+    rgba(45, 212, 191, 0.58)
+  );
+  color: #effefb;
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  box-shadow:
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.34),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.16),
+    var(--lift-3);
 }
+.app-shell { background: transparent; }
+
+/* =============================================================
+   Motion
+   ============================================================= */
 
 @keyframes rise-in {
-  from {
-    opacity: 0;
-    transform: translateY(12px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
 }
-
 @keyframes drift {
-  0%,
-  100% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(-6px);
-  }
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
 }
+.animate-rise { animation: rise-in 0.5s cubic-bezier(0.2, 0.9, 0.3, 1) both; }
+.animate-drift { animation: drift 5.5s ease-in-out infinite; }
 
-.animate-rise {
-  animation: rise-in 0.55s ease-out both;
-}
+/* =============================================================
+   react-day-picker
+   ============================================================= */
 
-.animate-drift {
-  animation: drift 5.5s ease-in-out infinite;
-}
-
-/* European datepicker (react-day-picker) */
 .rdp-root {
-  --rdp-accent-color: #0f766e;
-  --rdp-accent-background-color: #ccfbf1;
+  --rdp-accent-color: var(--primary);
+  --rdp-accent-background-color: var(--secondary);
   --rdp-day-height: 2.35rem;
   --rdp-day-width: 2.35rem;
   --rdp-day_button-height: 2.2rem;
   --rdp-day_button-width: 2.2rem;
-  --rdp-day_button-border-radius: 0.65rem;
+  --rdp-day_button-border-radius: var(--r-sm);
   font-family: inherit;
+  color: var(--foreground);
 }
-
 .rdp-flexipack .rdp-weekday {
   font-size: 0.75rem;
   font-weight: 600;
-  color: #78716c;
+  color: var(--subtle-foreground);
   text-transform: uppercase;
 }
-
 .rdp-flexipack .rdp-selected .rdp-day_button {
-  background: #0f766e !important;
-  color: #fff !important;
+  background: var(--primary) !important;
+  color: var(--primary-foreground) !important;
   border: none !important;
   font-weight: 600;
 }
-
 .rdp-flexipack .rdp-today:not(.rdp-selected) .rdp-day_button {
-  color: #0f766e;
+  color: var(--primary);
   font-weight: 700;
 }
 
+/* =============================================================
+   Print — glass has no business on paper
+   ============================================================= */
+
 @media print {
+  :root {
+    --glass-ultrathin: #fff;
+    --glass-thin: #fff;
+    --glass-regular: #fff;
+    --glass-thick: #fff;
+    --sheen: none;
+    --foreground: #000;
+  }
   body { background: #fff !important; }
-  .print\\:hidden { display: none !important; }
-  nav, .print-hide { display: none !important; }
+  .ambient-canvas { display: none !important; }
+  .glass, .card-surface, .card-surface-muted {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    box-shadow: none !important;
+    border: 1px solid #ddd !important;
+  }
+  nav, .print-hide, .print\:hidden { display: none !important; }
+}
+
+/* Horizontal filter rails scroll instead of wrapping inside their capsule. */
+.scroll-x {
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.scroll-x::-webkit-scrollbar {
+  display: none;
+}
+
+/* =============================================================
+   Paper — the print preview is a sheet, not a glass surface.
+   It stays light in dark mode so what you see matches what prints.
+   ============================================================= */
+
+.paper {
+  color-scheme: light;
+  background: #ffffff;
+  color: #1c1917;
+  border-radius: var(--r-lg);
+  box-shadow: var(--lift-2);
+}
+.paper * {
+  color-scheme: light;
+}
+@media print {
+  .paper {
+    box-shadow: none;
+    border-radius: 0;
+  }
 }

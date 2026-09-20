@@ -20,17 +20,17 @@ export function TemplatePicker({ onSelect, selectedId }: Props) {
           className={cn(
             "group rounded-2xl border p-5 text-left transition",
             selectedId === tpl.id
-              ? "border-teal-700 bg-teal-50 shadow-md"
-              : "border-stone-200 bg-white/80 hover:border-teal-300 hover:shadow-sm"
+              ? "border-teal-700 bg-[var(--secondary)] shadow-md"
+              : "border-[var(--edge)] bg-[var(--glass-thick)] hover:border-[var(--primary)] hover:shadow-sm"
           )}
         >
-          <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-amber-800">
+          <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-[var(--amber-700)] dark:text-[#fbbf24]">
             {tpl.tagline}
           </div>
-          <h3 className="font-display text-lg text-stone-900 group-hover:text-teal-900">
+          <h3 className="font-display text-lg text-foreground group-hover:text-primary">
             {tpl.name}
           </h3>
-          <p className="mt-2 text-sm leading-relaxed text-stone-600">
+          <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
             {tpl.description}
           </p>
         </button>

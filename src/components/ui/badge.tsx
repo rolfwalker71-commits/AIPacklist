@@ -3,16 +3,20 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
 const badgeVariants = cva(
-  "inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold tracking-wide",
+  "inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-bold tracking-wide",
   {
     variants: {
       variant: {
-        default: "border-transparent bg-primary text-primary-foreground",
-        secondary: "border-transparent bg-secondary text-secondary-foreground",
-        outline: "border-border text-foreground",
-        muted: "border-transparent bg-muted text-muted-foreground",
-        warning: "border-transparent bg-amber-100 text-amber-950",
-        info: "border-transparent bg-sky-100 text-sky-950",
+        default:
+          "text-white bg-[linear-gradient(160deg,var(--teal-600),var(--teal-800))] shadow-[inset_0_1px_0_rgba(255,255,255,0.28)]",
+        secondary:
+          "bg-secondary text-secondary-foreground shadow-[inset_0_0_0_1px_var(--edge)]",
+        outline: "text-muted-foreground shadow-[inset_0_0_0_1px_var(--edge)]",
+        muted:
+          "bg-[var(--glass-thick)] text-muted-foreground shadow-[inset_0_0_0_1px_var(--edge)]",
+        warning:
+          "bg-accent text-accent-foreground shadow-[inset_0_0_0_1px_rgba(180,83,9,0.22)]",
+        info: "bg-secondary text-secondary-foreground shadow-[inset_0_0_0_1px_var(--edge)]",
       },
     },
     defaultVariants: { variant: "default" },
