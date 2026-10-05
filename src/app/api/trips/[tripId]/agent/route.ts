@@ -86,7 +86,7 @@ export async function POST(
         if (!item.suitcaseId) continue;
         fill.set(
           item.suitcaseId,
-          (fill.get(item.suitcaseId) || 0) + Math.max(1, item.quantity)
+          (fill.get(item.suitcaseId) || 0) + 1
         );
       }
       const travelerNameByKey = new Map(travelers.map((t) => [t.key, t.name]));
@@ -135,7 +135,7 @@ export async function POST(
           if (suitcaseId) {
             fill.set(
               suitcaseId,
-              (fill.get(suitcaseId) || 0) + Math.max(1, row.quantity)
+              (fill.get(suitcaseId) || 0) + 1
             );
           }
 

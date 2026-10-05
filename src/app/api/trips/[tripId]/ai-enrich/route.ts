@@ -117,7 +117,7 @@ export async function POST(
       if (!item.suitcaseId) continue;
       currentCounts.set(
         item.suitcaseId,
-        (currentCounts.get(item.suitcaseId) || 0) + Math.max(1, item.quantity)
+        (currentCounts.get(item.suitcaseId) || 0) + 1
       );
     }
 
@@ -187,7 +187,7 @@ export async function POST(
         if (item.suitcaseId) {
           reFill.set(
             item.suitcaseId,
-            (reFill.get(item.suitcaseId) || 0) + Math.max(1, item.quantity)
+            (reFill.get(item.suitcaseId) || 0) + 1
           );
         }
       }
@@ -209,7 +209,7 @@ export async function POST(
             item.suitcaseId,
             Math.max(
               0,
-              (reFill.get(item.suitcaseId) || 0) - Math.max(1, item.quantity)
+              (reFill.get(item.suitcaseId) || 0) - 1
             )
           );
         }
@@ -289,7 +289,7 @@ export async function POST(
       if (!item.suitcaseId) continue;
       finalCounts.set(
         item.suitcaseId,
-        (finalCounts.get(item.suitcaseId) || 0) + Math.max(1, item.quantity)
+        (finalCounts.get(item.suitcaseId) || 0) + 1
       );
     }
     const capacity = analyzeCapacity(bags, finalCounts);

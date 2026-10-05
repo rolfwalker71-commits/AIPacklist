@@ -54,7 +54,8 @@ export function pickSuitcaseForItem(
 ): string | null {
   if (!bags.length) return null;
 
-  const qty = Math.max(1, item.quantity || 1);
+  // A "position" is one list entry, whatever its quantity (15 pairs of socks = 1 position).
+  const qty = 1;
   const preferred = item.preferredSuitcaseId
     ? bags.find((b) => b.id === item.preferredSuitcaseId)
     : null;
