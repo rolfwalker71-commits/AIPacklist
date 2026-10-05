@@ -9,6 +9,7 @@ import { TravelMotif } from "@/components/app/travel-motif";
 import { BrandLogo } from "@/components/app/brand-logo";
 import { AvatarStack } from "@/components/app/avatar-stack";
 import { TripList } from "@/components/app/trip-list";
+import { Onboarding } from "@/components/app/onboarding";
 import { formatDate } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -57,6 +58,7 @@ export default async function HomePage() {
 
   return (
     <main className="mx-auto w-full max-w-lg px-4 pb-8 pt-8 md:max-w-3xl lg:max-w-6xl lg:px-8 lg:pt-10">
+      <Onboarding />
       <header className="animate-rise mb-6 flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <span className="glass glass-thick flex h-12 w-12 shrink-0 items-center justify-center rounded-full pad:hidden">

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { GenderPicker } from "@/components/ui/gender-picker";
+import { resetHints } from "@/components/ui/explainer-card";
 
 type Gender = "FEMALE" | "MALE" | "UNSPECIFIED";
 
@@ -181,7 +182,9 @@ export function ProfileEditor({
       {message && (
         <p
           className={`text-sm font-medium ${
-            message === "Gespeichert" || message === "Avatar entfernt"
+            message === "Gespeichert" ||
+            message === "Avatar entfernt" ||
+            message.startsWith("Hinweise")
               ? "text-primary"
               : message.includes("gewählt")
                 ? "text-[var(--amber-700)] dark:text-[#fbbf24]"
@@ -199,6 +202,16 @@ export function ProfileEditor({
       >
         {busy ? "Speichern…" : "Speichern"}
       </Button>
+      <button
+        type="button"
+        onClick={() => {
+          resetHints();
+          setMessage("Hinweise und Einführung werden wieder angezeigt.");
+        }}
+        className="w-full text-center text-xs font-semibold text-muted-foreground hover:text-foreground"
+      >
+        Hinweise und Einführung wieder anzeigen
+      </button>
     </div>
   );
 }

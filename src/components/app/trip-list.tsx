@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowUpDown, Search, X } from "lucide-react";
+import { ArrowUpDown, Luggage, Search, X } from "lucide-react";
+import { rowColor } from "@/lib/accents";
 import { SwipeRow } from "@/components/ui/swipe-row";
 import { Segment, Segmented } from "@/components/ui/segmented";
 import { Badge } from "@/components/ui/badge";
@@ -174,6 +175,15 @@ export function TripList({
                     className="glass glass-press block w-full select-none rounded-[var(--r-lg)] p-4 text-left disabled:opacity-60"
                   >
                     <div className="flex items-start justify-between gap-3">
+                      <span
+                        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.4)]"
+                        style={{
+                          background: `linear-gradient(150deg, ${rowColor(trip.id)}, color-mix(in srgb, ${rowColor(trip.id)} 66%, black))`,
+                        }}
+                        aria-hidden
+                      >
+                        <Luggage className="h-5 w-5" />
+                      </span>
                       <div className="min-w-0 flex-1">
                         <div className="font-display text-card-title text-foreground">
                           {trip.title}

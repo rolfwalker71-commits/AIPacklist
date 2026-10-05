@@ -1,4 +1,4 @@
-import type { ButtonHTMLAttributes, ReactNode } from "react";
+import type { ButtonHTMLAttributes, CSSProperties, ReactNode } from "react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 
@@ -38,7 +38,7 @@ const dockItemClass = (active?: boolean) =>
     "flex min-h-11 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-[20px] px-1 py-1.5",
     "text-[0.68rem] font-semibold leading-none transition active:scale-[0.96]",
     active
-      ? "bg-[rgba(255,255,255,0.85)] text-[var(--teal-800)] shadow-[inset_0_1px_0_rgba(255,255,255,0.95),0_2px_8px_rgba(11,61,57,0.12)] dark:bg-[rgba(255,255,255,0.14)] dark:text-[#7fe8da]"
+      ? "bg-[rgba(255,255,255,0.85)] text-[var(--accent-c,var(--teal-800))] shadow-[inset_0_1px_0_rgba(255,255,255,0.95),0_2px_8px_rgba(11,61,57,0.12)] dark:bg-[rgba(255,255,255,0.14)] dark:text-[var(--accent-c-dark,#7fe8da)]"
       : "bg-transparent text-subtle"
   );
 
@@ -47,15 +47,20 @@ export function DockItem({
   label,
   children,
   className,
+  accent,
+  style,
   ...props
 }: ButtonHTMLAttributes<HTMLButtonElement> & {
   active?: boolean;
   label: string;
+  /** CSS custom properties (--accent-c, --accent-c-dark) for the active colour. */
+  accent?: Record<string, string>;
 }) {
   return (
     <button
       type="button"
       {...props}
+      style={{ ...(accent as CSSProperties), ...style }}
       className={cn(dockItemClass(active), className)}
       aria-current={active ? "page" : undefined}
     >
@@ -129,7 +134,7 @@ const sideLinkClass = (active?: boolean) =>
     "flex min-h-11 items-center gap-3 rounded-[var(--r-md)] px-3.5 text-left",
     "text-[0.95rem] font-semibold transition active:scale-[0.98]",
     active
-      ? "glass glass-thick text-[var(--teal-800)] backdrop-blur-xl dark:text-[#7fe8da]"
+      ? "glass glass-thick text-[var(--accent-c,var(--teal-800))] backdrop-blur-xl dark:text-[var(--accent-c-dark,#7fe8da)]"
       : "bg-transparent text-muted-foreground hover:text-foreground"
   );
 
@@ -167,15 +172,19 @@ export function SideButton({
   count,
   children,
   className,
+  accent,
+  style,
   ...props
 }: ButtonHTMLAttributes<HTMLButtonElement> & {
   active?: boolean;
   icon?: ReactNode;
   count?: ReactNode;
+  accent?: Record<string, string>;
 }) {
   return (
     <button
       type="button"
+      style={{ ...(accent as CSSProperties), ...style }}
       className={cn(sideLinkClass(active), "w-full", className)}
       aria-current={active ? "page" : undefined}
       {...props}

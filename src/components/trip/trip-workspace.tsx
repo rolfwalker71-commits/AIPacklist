@@ -39,6 +39,8 @@ import {
   SideSection,
 } from "@/components/app/floating-dock";
 import { Track } from "@/components/ui/glass";
+import { ExplainerCard } from "@/components/ui/explainer-card";
+import { TAB_ACCENT, accentVars, categoryStyle } from "@/lib/accents";
 import { Segment, Segmented } from "@/components/ui/segmented";
 import { AddPackItemForm } from "@/components/trip/add-pack-item-form";
 import { ItemIllustration } from "@/components/trip/item-illustration";
@@ -1600,6 +1602,8 @@ export function TripWorkspace({
     const open = isSectionOpen(key);
     const stats = openStats(items, trip);
     const Icon = opts?.icon === "clock" ? Clock : Briefcase;
+    const cat = opts?.icon === "briefcase" ? categoryStyle(title) : null;
+    const CatIcon = cat?.icon;
     const iconClass =
       opts?.icon === "clock"
         ? "text-[var(--amber-700)] dark:text-[#fbbf24]"
@@ -1623,9 +1627,20 @@ export function TripWorkspace({
           className="relative flex w-full items-start gap-2.5 rounded-[var(--r-md)] px-2.5 py-2.5 text-left transition active:scale-[0.99]"
           aria-expanded={open}
         >
-          <span className="glass glass-thin mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full">
-            <Icon className={cn("h-4 w-4", iconClass)} />
-          </span>
+          {cat && CatIcon ? (
+            <span
+              className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.4),0_2px_6px_rgba(0,0,0,0.18)]"
+              style={{
+                background: `linear-gradient(150deg, ${cat.color}, color-mix(in srgb, ${cat.color} 68%, black))`,
+              }}
+            >
+              <CatIcon className="h-4 w-4" />
+            </span>
+          ) : (
+            <span className="glass glass-thin mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full">
+              <Icon className={cn("h-4 w-4", iconClass)} />
+            </span>
+          )}
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
               <span className="font-display text-card-title text-foreground">
@@ -1833,7 +1848,17 @@ export function TripWorkspace({
               key={tab.id}
               active={activeTab === tab.id}
               onClick={() => setTab(tab.id)}
-              icon={<Icon className="size-5 shrink-0" />}
+              accent={accentVars(TAB_ACCENT[tab.id])}
+              icon={
+                <Icon
+                  className="size-5 shrink-0"
+                  style={
+                    activeTab === tab.id
+                      ? undefined
+                      : { color: TAB_ACCENT[tab.id].light }
+                  }
+                />
+              }
               count={tab.count}
             >
               {tab.sideLabel ?? tab.label}
@@ -1979,6 +2004,12 @@ export function TripWorkspace({
         )}
       </header>
 
+      {activeTab === "pack" && (
+        <ExplainerCard id="pack" kind="pack" title="So packst du">
+          Tippe ein Item an, um es abzuhaken. Alle auf der Reise sehen es sofort.
+          Mit den Filtern siehst du nur deine Liste oder das Gemeinsame.
+        </ExplainerCard>
+      )}
       {activeTab === "pack" && (
         <section className="space-y-4">
           <div className="hero-panel px-5 py-5">
@@ -2214,6 +2245,12 @@ export function TripWorkspace({
         </section>
       )}
 
+      {activeTab === "legs" && (
+        <ExplainerCard id="route" kind="weather" title="Route und Wetter">
+          Aus den Etappen berechnet FlexiPack Mengen für Kleidung und Wäsche. Das
+          Wetter beeinflusst, was auf die Liste kommt.
+        </ExplainerCard>
+      )}
       {activeTab === "legs" && (
         <section className="space-y-4">
           <div className="hero-panel px-5 py-6" style={{ background: "linear-gradient(150deg, rgba(180,83,9,0.90), rgba(217,119,6,0.74) 52%, rgba(15,118,110,0.62))" }}>
@@ -2485,6 +2522,12 @@ export function TripWorkspace({
         </section>
       )}
 
+      {activeTab === "bags" && (
+        <ExplainerCard id="bags" kind="bags" title="Koffer-Füllstand">
+          Die Anzeige zählt Positionen pro Koffer. Wird ein Koffer zu voll, warnt
+          dich FlexiPack.
+        </ExplainerCard>
+      )}
       {activeTab === "bags" && (
         <section className="space-y-4">
           <div className="hero-panel px-5 py-6">
@@ -2867,6 +2910,12 @@ export function TripWorkspace({
       )}
 
       {activeTab === "ai" && (
+        <ExplainerCard id="tips" kind="tips" title="KI-Hilfe">
+          Die KI ergänzt nur, was auf deiner Liste noch fehlt, und schreibt Tipps
+          zu Einreise, Klima und Verhalten.
+        </ExplainerCard>
+      )}
+      {activeTab === "ai" && (
         <section className="space-y-5">
           <div className="hero-panel px-5 py-6" style={{ background: "linear-gradient(150deg, rgba(11,61,57,0.92), rgba(15,118,110,0.76) 52%, rgba(180,83,9,0.62))" }}>
             <TipsMotif className="absolute -right-1 bottom-0 h-28 w-40 opacity-50" />
@@ -2969,6 +3018,12 @@ export function TripWorkspace({
       )}
 
       {activeTab === "people" && (
+        <ExplainerCard id="team" kind="join" title="Mitreisende einladen">
+          Gib den Einladungscode weiter. Wer kein iPhone hat, öffnet diese Seite im
+          Browser und tritt dort bei.
+        </ExplainerCard>
+      )}
+      {activeTab === "people" && (
         <TripTeamPanel
           trip={trip}
           userId={user.id}
@@ -3005,9 +3060,17 @@ export function TripWorkspace({
               key={tab.id}
               label={tab.label}
               active={activeTab === tab.id}
+              accent={accentVars(TAB_ACCENT[tab.id])}
               onClick={() => setTab(tab.id)}
             >
-              <Icon className="h-5 w-5" />
+              <Icon
+                className="h-5 w-5"
+                style={
+                  activeTab === tab.id
+                    ? undefined
+                    : { color: TAB_ACCENT[tab.id].light }
+                }
+              />
             </DockItem>
           );
         })}
