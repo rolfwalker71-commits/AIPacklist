@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { guardTrip } from "@/lib/trip-access";
 import { buildTravelInsights } from "@/lib/ai-pack";
 import {
   mergeInsights,
@@ -17,6 +18,8 @@ export async function POST(
   { params }: { params: Promise<{ tripId: string }> }
 ) {
   const { tripId } = await params;
+  const guard = await guardTrip(tripId);
+  if ("response" in guard) return guard.response;
   try {
     if (!isAiConfigured()) {
       return NextResponse.json(

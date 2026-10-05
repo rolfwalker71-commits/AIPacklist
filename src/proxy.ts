@@ -48,7 +48,9 @@ export function proxy(request: NextRequest) {
     });
   }
 
-  const token = request.cookies.get(SESSION_COOKIE)?.value;
+  const token =
+    request.cookies.get(SESSION_COOKIE)?.value ||
+    request.headers.get("authorization")?.match(/^Bearer\s+\S+$/i)?.[0];
   if (!token) {
     if (pathname.startsWith("/api/")) {
       return NextResponse.json({ error: "Nicht angemeldet" }, { status: 401 });

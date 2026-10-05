@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
+  authErrorResponse,
+  requireAdmin,
+  requireSessionUser,
+} from "@/lib/auth";
+import {
   getOpenAiModel,
   isAiConfigured,
   maskKey,
@@ -9,6 +14,12 @@ import {
 } from "@/lib/openai";
 
 export async function GET() {
+  try {
+    await requireSessionUser();
+  } catch (e) {
+    const { error, status } = authErrorResponse(e);
+    return NextResponse.json({ error }, { status });
+  }
   const key = getOpenAiApiKey();
   const settings = readAiSettings();
   return NextResponse.json({
@@ -30,6 +41,12 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
+  try {
+    await requireAdmin();
+  } catch (e) {
+    const { error, status } = authErrorResponse(e);
+    return NextResponse.json({ error }, { status });
+  }
   const body = await req.json();
   const openaiApiKey =
     typeof body.openaiApiKey === "string" ? body.openaiApiKey.trim() : undefined;

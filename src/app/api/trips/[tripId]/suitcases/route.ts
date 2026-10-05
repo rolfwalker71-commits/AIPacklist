@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { guardTrip } from "@/lib/trip-access";
 import { publish } from "@/lib/events";
 import { serializeTrip, tripInclude } from "@/lib/trip-service";
 import type { SuitcaseSize } from "@/lib/suitcases";
@@ -9,6 +10,8 @@ export async function POST(
   { params }: { params: Promise<{ tripId: string }> }
 ) {
   const { tripId } = await params;
+  const guard = await guardTrip(tripId);
+  if ("response" in guard) return guard.response;
   const body = await req.json();
   const trip = await prisma.trip.findUnique({ where: { id: tripId } });
   if (!trip) {
@@ -38,6 +41,8 @@ export async function PATCH(
   { params }: { params: Promise<{ tripId: string }> }
 ) {
   const { tripId } = await params;
+  const guard = await guardTrip(tripId);
+  if ("response" in guard) return guard.response;
   const body = await req.json();
   if (!body.suitcaseId) {
     return NextResponse.json({ error: "suitcaseId required" }, { status: 400 });
@@ -75,6 +80,8 @@ export async function DELETE(
   { params }: { params: Promise<{ tripId: string }> }
 ) {
   const { tripId } = await params;
+  const guard = await guardTrip(tripId);
+  if ("response" in guard) return guard.response;
   const suitcaseId = req.nextUrl.searchParams.get("suitcaseId");
   if (!suitcaseId) {
     return NextResponse.json({ error: "suitcaseId required" }, { status: 400 });

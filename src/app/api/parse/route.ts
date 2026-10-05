@@ -1,10 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
+import { authErrorResponse, requireSessionUser } from "@/lib/auth";
 import { parseVibeWithAi } from "@/lib/ai-parse";
 import { buildPackList } from "@/lib/ai-pack";
 import { isAiConfigured } from "@/lib/openai";
 import type { TravelerProfile } from "@/lib/types";
 
 export async function POST(req: NextRequest) {
+  try {
+    await requireSessionUser();
+  } catch (e) {
+    const { error, status } = authErrorResponse(e);
+    return NextResponse.json({ error }, { status });
+  }
   const body = await req.json();
   const prompt = String(body.prompt || "").trim();
   const startDate = body.startDate as string | undefined;

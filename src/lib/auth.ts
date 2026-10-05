@@ -4,7 +4,7 @@ import {
   scryptSync,
   timingSafeEqual,
 } from "crypto";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { prisma } from "@/lib/db";
 import type { AppRole } from "@prisma/client";
 import { SESSION_COOKIE } from "@/lib/auth-constants";
@@ -94,10 +94,22 @@ export async function getUserFromToken(
   };
 }
 
-export async function getSessionUser(): Promise<SessionUser | null> {
+/** Bearer token from the Authorization header (native app clients). */
+export function bearerFromHeader(value: string | null | undefined) {
+  const m = value?.match(/^Bearer\s+([A-Za-z0-9]{32,128})$/i);
+  return m ? m[1] : null;
+}
+
+/** Session token from the cookie (web) or the Authorization header (app). */
+export async function getRequestToken(): Promise<string | null> {
+  const bearer = bearerFromHeader((await headers()).get("authorization"));
+  if (bearer) return bearer;
   const jar = await cookies();
-  const token = jar.get(SESSION_COOKIE)?.value;
-  return getUserFromToken(token);
+  return jar.get(SESSION_COOKIE)?.value ?? null;
+}
+
+export async function getSessionUser(): Promise<SessionUser | null> {
+  return getUserFromToken(await getRequestToken());
 }
 
 export function sessionCookieOptions(maxAgeSec = SESSION_DAYS * 24 * 60 * 60) {

@@ -16,6 +16,7 @@ async function readCredentials(req: NextRequest) {
       password: String(body.password || ""),
       next: String(body.next || "/"),
       wantsJson: true,
+      wantsToken: body.client === "app",
     };
   }
 
@@ -25,6 +26,7 @@ async function readCredentials(req: NextRequest) {
     password: String(form.get("password") || ""),
     next: String(form.get("next") || "/"),
     wantsJson: false,
+    wantsToken: false,
   };
 }
 
@@ -58,18 +60,42 @@ async function resolveUser(usernameRaw: string) {
   );
 }
 
+const MAX_ATTEMPTS = 10;
+const WINDOW_MS = 15 * 60 * 1000;
+const attempts = new Map<string, { count: number; resetAt: number }>();
+
+function rateLimited(key: string) {
+  const now = Date.now();
+  const entry = attempts.get(key);
+  if (!entry || entry.resetAt < now) return false;
+  return entry.count >= MAX_ATTEMPTS;
+}
+
+function recordFailure(key: string) {
+  const now = Date.now();
+  const entry = attempts.get(key);
+  if (!entry || entry.resetAt < now) {
+    attempts.set(key, { count: 1, resetAt: now + WINDOW_MS });
+  } else {
+    entry.count += 1;
+  }
+}
+
 export async function POST(req: NextRequest) {
   try {
-    const { usernameRaw, password, next, wantsJson } = await readCredentials(req);
+    const { usernameRaw, password, next, wantsJson, wantsToken } =
+      await readCredentials(req);
+    const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "local";
+    const limitKey = `${ip}|${usernameRaw.trim().toLowerCase()}`;
+    if (rateLimited(limitKey)) {
+      return NextResponse.json(
+        { error: "Zu viele Versuche. Bitte später erneut probieren." },
+        { status: 429 }
+      );
+    }
     const dest = safeNext(next);
     const passwordTrimmed = password.trim();
 
-    console.info("[login]", {
-      usernameRaw,
-      usernameLen: usernameRaw.trim().length,
-      passwordLen: passwordTrimmed.length,
-      host: req.headers.get("host"),
-    });
 
     if (!usernameRaw.trim() || !passwordTrimmed) {
       if (wantsJson) {
@@ -88,14 +114,9 @@ export async function POST(req: NextRequest) {
       user.isActive &&
       verifyPassword(passwordTrimmed, user.passwordHash);
 
-    console.info("[login] result", {
-      found: !!user,
-      userId: user?.id,
-      username: user?.username,
-      ok,
-    });
 
     if (!ok || !user) {
+      recordFailure(limitKey);
       if (wantsJson) {
         return NextResponse.json(
           { error: "Anmeldung fehlgeschlagen." },
@@ -108,8 +129,10 @@ export async function POST(req: NextRequest) {
     const token = await createSession(user.id);
 
     if (wantsJson) {
+      attempts.delete(limitKey);
       const res = NextResponse.json({
         ok: true,
+        ...(wantsToken ? { token } : {}),
         user: {
           id: user.id,
           name: user.name,
