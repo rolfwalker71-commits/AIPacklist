@@ -18,6 +18,11 @@ services:
       VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
       VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
       VAPID_SUBJECT: ${VAPID_SUBJECT:-mailto:flexipack@localhost}
+      # Native iOS-Push (APNs). Key-Datei (.p8) im Volume ablegen, z. B. /app/data/apns/AuthKey_XXXX.p8
+      APNS_KEY_ID: ${APNS_KEY_ID:-}
+      APNS_TEAM_ID: ${APNS_TEAM_ID:-}
+      APNS_KEY_PATH: ${APNS_KEY_PATH:-/app/data/apns/AuthKey.p8}
+      APNS_BUNDLE_ID: ${APNS_BUNDLE_ID:-ch.rolfwalker.flexipack}
     restart: unless-stopped
     healthcheck:
       test:

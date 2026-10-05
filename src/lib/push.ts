@@ -1,5 +1,6 @@
 import webpush from "web-push";
 import { prisma } from "@/lib/db";
+import { apnsConfigured, sendApns, type ApnsEnvironment } from "@/lib/apns";
 
 export type PushMotif = "pack" | "team" | "route" | "tips";
 
@@ -56,13 +57,17 @@ function ensureVapid() {
   return true;
 }
 
-/** Send a web-push to every device of every trip member. */
+/** Send a push to every device of every trip member: web push (PWA) and native iOS push (APNs). */
 export async function notifyTripMembers(
   tripId: string,
   payload: PushPayload,
   opts?: { excludeUserId?: string }
 ) {
-  if (!ensureVapid()) return { sent: 0, skipped: "vapid" as const };
+  const webReady = ensureVapid();
+  const apnsReady = apnsConfigured();
+  if (!webReady && !apnsReady) {
+    return { sent: 0, skipped: "not-configured" as const };
+  }
 
   const members = await prisma.tripMember.findMany({
     where: { tripId },
@@ -73,6 +78,52 @@ export async function notifyTripMembers(
     .filter((id) => id !== opts?.excludeUserId);
   if (!userIds.length) return { sent: 0 };
 
+  const [web, native] = await Promise.all([
+    webReady
+      ? sendWebPush(tripId, userIds, payload)
+      : Promise.resolve({ sent: 0 }),
+    apnsReady
+      ? sendNativePush(tripId, userIds, payload)
+      : Promise.resolve({ sent: 0 }),
+  ]);
+  return { sent: web.sent + native.sent, web: web.sent, native: native.sent };
+}
+
+async function sendNativePush(
+  tripId: string,
+  userIds: string[],
+  payload: PushPayload
+) {
+  const devices = await prisma.apnsDevice.findMany({
+    where: { userId: { in: userIds } },
+  });
+  if (!devices.length) return { sent: 0 };
+
+  const results = await Promise.all(
+    devices.map(async (d) => ({
+      id: d.id,
+      result: await sendApns(d.token, d.environment as ApnsEnvironment, {
+        title: payload.title,
+        body: payload.body,
+        collapseId: payload.tag || `trip-${tripId}`,
+        threadId: `trip-${tripId}`,
+        data: { tripId, url: payload.url || `/trip/${tripId}` },
+      }),
+    }))
+  );
+
+  const stale = results.filter((r) => r.result === "stale").map((r) => r.id);
+  if (stale.length) {
+    await prisma.apnsDevice.deleteMany({ where: { id: { in: stale } } });
+  }
+  return { sent: results.filter((r) => r.result === "sent").length };
+}
+
+async function sendWebPush(
+  tripId: string,
+  userIds: string[],
+  payload: PushPayload
+) {
   const subs = await prisma.pushSubscription.findMany({
     where: { userId: { in: userIds } },
   });

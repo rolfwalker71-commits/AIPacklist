@@ -43,13 +43,14 @@ model User {
   gender       Gender   @default(UNSPECIFIED)
   createdAt    DateTime @default(now())
 
-  ownedTrips         Trip[]              @relation("TripOwner")
-  memberships        TripMember[]
-  suitcases          Suitcase[]
-  packedItems        PackItem[]          @relation("PackedBy")
-  ownedPackItems     PackItem[]          @relation("ItemOwner")
-  sessions           Session[]
-  pushSubscriptions  PushSubscription[]
+  ownedTrips        Trip[]             @relation("TripOwner")
+  memberships       TripMember[]
+  suitcases         Suitcase[]
+  packedItems       PackItem[]         @relation("PackedBy")
+  ownedPackItems    PackItem[]         @relation("ItemOwner")
+  sessions          Session[]
+  pushSubscriptions PushSubscription[]
+  apnsDevices       ApnsDevice[]
 }
 
 model Session {
@@ -78,16 +79,31 @@ model PushSubscription {
   @@index([userId])
 }
 
+/// Native iOS push (APNs). Web push (VAPID) stays in PushSubscription.
+model ApnsDevice {
+  id          String   @id @default(cuid())
+  userId      String
+  token       String   @unique
+  /// "sandbox" (Xcode debug builds) or "production" (TestFlight / App Store)
+  environment String   @default("production")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
 model Trip {
-  id              String    @id @default(cuid())
-  title           String
-  startDate       DateTime
-  endDate         DateTime
-  inviteCode      String    @unique
-  inviteEnabled   Boolean   @default(true)
-  inviteExpiresAt DateTime?
-  inviteMaxUses   Int?
-  inviteUseCount  Int       @default(0)
+  id                  String    @id @default(cuid())
+  title               String
+  startDate           DateTime
+  endDate             DateTime
+  inviteCode          String    @unique
+  inviteEnabled       Boolean   @default(true)
+  inviteExpiresAt     DateTime?
+  inviteMaxUses       Int?
+  inviteUseCount      Int       @default(0)
   /// Share itinerary only (no pack list) with another group
   routeShareCode      String?   @unique
   routeShareEnabled   Boolean   @default(false)
@@ -97,9 +113,9 @@ model Trip {
   /// Push milestones already fired (avoid spam on re-cross)
   pushMilestone50At   DateTime?
   pushMilestone100At  DateTime?
-  aiInsights      String    @default("{}")
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  aiInsights          String    @default("{}")
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
 
   ownerId String
   owner   User   @relation("TripOwner", fields: [ownerId], references: [id])
@@ -149,8 +165,8 @@ model Suitcase {
   isShared    Boolean      @default(false)
 
   tripId String
-  trip   Trip  @relation(fields: [tripId], references: [id], onDelete: Cascade)
-  owner  User? @relation(fields: [ownerUserId], references: [id])
+  trip   Trip   @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  owner  User?  @relation(fields: [ownerUserId], references: [id])
 
   items PackItem[]
 }
@@ -178,7 +194,7 @@ model PackItem {
   photoUrl       String?
 
   tripId String
-  trip   Trip  @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  trip   Trip   @relation(fields: [tripId], references: [id], onDelete: Cascade)
 
   packedBy User?     @relation("PackedBy", fields: [packedByUserId], references: [id])
   owner    User?     @relation("ItemOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
