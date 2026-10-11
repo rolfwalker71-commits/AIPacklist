@@ -68,7 +68,7 @@ export function proxy(request: NextRequest) {
       : request.nextUrl.clone();
     url.pathname = "/login.html";
     url.search = "";
-    url.searchParams.set("next", pathname);
+    url.searchParams.set("next", pathname + request.nextUrl.search);
     return NextResponse.redirect(url);
   }
 

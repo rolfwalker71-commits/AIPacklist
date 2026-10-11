@@ -116,7 +116,10 @@ export async function POST(req: NextRequest) {
       !!user &&
       !!user.passwordHash &&
       user.isActive &&
-      verifyPassword(passwordTrimmed, user.passwordHash);
+      // Setup/admin store the password untrimmed, so try the raw value too.
+      (verifyPassword(password, user.passwordHash) ||
+        (passwordTrimmed !== password &&
+          verifyPassword(passwordTrimmed, user.passwordHash)));
 
 
     if (!ok || !user) {

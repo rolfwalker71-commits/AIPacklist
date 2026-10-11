@@ -130,7 +130,6 @@ export default async function LoginPage({
                 type="password"
                 autoComplete="current-password"
                 required
-                minLength={8}
               />
             </div>
             {error && <p className="text-base text-destructive">{error}</p>}
