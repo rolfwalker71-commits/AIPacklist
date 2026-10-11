@@ -19,14 +19,23 @@ function JoinForm() {
     setBusy(true);
     setError(null);
     try {
-      const find = await fetch(`/api/join?code=${encodeURIComponent(code)}`);
-      if (!find.ok) throw new Error("Einladungscode ungültig");
+      const find = await fetch(`/api/join?code=${encodeURIComponent(code.trim())}`);
+      if (!find.ok) {
+        const data = await find.json().catch(() => ({}));
+        throw new Error(
+          find.status === 404
+            ? "Einladungscode nicht gefunden"
+            : find.status === 401
+              ? "Nicht angemeldet – bitte neu anmelden"
+              : data.error || "Einladungscode ungültig"
+        );
+      }
       const trip = await find.json();
 
       const res = await fetch(`/api/trips/${trip.id}/members`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ inviteCode: code }),
+        body: JSON.stringify({ inviteCode: code.trim() }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
