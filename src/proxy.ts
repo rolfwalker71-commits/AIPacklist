@@ -55,8 +55,19 @@ export function proxy(request: NextRequest) {
     if (pathname.startsWith("/api/")) {
       return NextResponse.json({ error: "Nicht angemeldet" }, { status: 401 });
     }
-    const url = request.nextUrl.clone();
+    // Behind a reverse proxy nextUrl.host is the internal 0.0.0.0:3330, so
+    // build the redirect target from the forwarded public host instead.
+    const host =
+      request.headers.get("x-forwarded-host")?.split(",")[0]?.trim() ||
+      request.headers.get("host");
+    const proto =
+      request.headers.get("x-forwarded-proto")?.split(",")[0]?.trim() ||
+      request.nextUrl.protocol.replace(":", "");
+    const url = host
+      ? new URL(`${proto}://${host}/login.html`)
+      : request.nextUrl.clone();
     url.pathname = "/login.html";
+    url.search = "";
     url.searchParams.set("next", pathname);
     return NextResponse.redirect(url);
   }

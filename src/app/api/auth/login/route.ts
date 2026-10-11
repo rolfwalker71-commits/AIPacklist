@@ -34,11 +34,15 @@ function safeNext(raw: string) {
   return raw.startsWith("/") && !raw.startsWith("//") ? raw : "/";
 }
 
-function loginErrorRedirect(req: NextRequest, code: string, next: string) {
-  const url = new URL("/login.html", req.url);
-  url.searchParams.set("error", code);
-  if (next && next !== "/") url.searchParams.set("next", next);
-  return NextResponse.redirect(url, 303);
+// Relative Location: behind a reverse proxy req.url is the internal
+// http://0.0.0.0:3330, so an absolute URL would point at an unreachable host.
+function loginErrorRedirect(_req: NextRequest, code: string, next: string) {
+  const params = new URLSearchParams({ error: code });
+  if (next && next !== "/") params.set("next", next);
+  return new NextResponse(null, {
+    status: 303,
+    headers: { Location: `/login.html?${params.toString()}` },
+  });
 }
 
 async function resolveUser(usernameRaw: string) {
